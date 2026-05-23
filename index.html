@@ -40,9 +40,9 @@ body{display:flex;flex-direction:column;}
 .ctrl-btn:hover{border-color:var(--move-color);color:var(--text-primary);}
 .reset-btn{position:absolute;bottom:20px;left:16px;z-index:50;background:rgba(19,22,20,0.92);border:1px solid var(--border);border-radius:10px;padding:8px 14px;font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);cursor:pointer;backdrop-filter:blur(8px);transition:all .15s;}
 .reset-btn:hover{border-color:var(--text-muted);color:var(--text-primary);}
-.overlay{position:fixed;inset:0;z-index:200;pointer-events:none;transition:background .28s;}
+.overlay{position:fixed;inset:0;z-index:200;pointer-events:none;transition:background .28s;touch-action:auto;}
 .overlay.open{pointer-events:all;background:rgba(0,0,0,.72);}
-.panel{position:absolute;bottom:0;left:0;right:0;background:var(--surface);border-radius:18px 18px 0 0;border-top:1px solid var(--border);max-height:84vh;overflow-y:auto;-webkit-overflow-scrolling:touch;transform:translateY(100%);transition:transform .34s cubic-bezier(.32,.72,0,1);box-shadow:0 -8px 48px rgba(0,0,0,.6);}
+.panel{position:absolute;bottom:0;left:0;right:0;background:var(--surface);border-radius:18px 18px 0 0;border-top:1px solid var(--border);max-height:84vh;overflow-y:auto;-webkit-overflow-scrolling:touch;transform:translateY(100%);transition:transform .34s cubic-bezier(.32,.72,0,1);box-shadow:0 -8px 48px rgba(0,0,0,.6);touch-action:auto;}
 .panel::-webkit-scrollbar{display:none;}
 .overlay.open .panel{transform:translateY(0);}
 .drag-handle{width:32px;height:3px;background:var(--border);border-radius:2px;margin:12px auto 0;}
@@ -59,7 +59,7 @@ body{display:flex;flex-direction:column;}
 .pc-pas{background:rgba(180,120,255,0.15);color:#b478ff;border:1px solid rgba(180,120,255,0.3);}
 .pc-pos{background:rgba(74,158,255,0.12);color:#4a9eff;border:1px solid rgba(74,158,255,0.25);}
 .pc-ctr{background:rgba(255,255,255,0.06);color:var(--text-muted);border:1px solid var(--border);}
-.close-x{position:absolute;top:12px;right:16px;width:28px;height:28px;border-radius:6px;background:var(--border);border:none;cursor:pointer;font-size:13px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;}
+.close-x{position:absolute;top:12px;right:16px;width:36px;height:36px;border-radius:8px;background:var(--border);border:none;cursor:pointer;font-size:15px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;touch-action:auto;z-index:10;-webkit-tap-highlight-color:rgba(255,255,255,0.1);}
 .vid-wrap{margin:0 18px 14px;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:16/9;position:relative;}
 .vid-thumb{width:100%;height:100%;position:relative;cursor:pointer;display:block;border:none;padding:0;background:#111;}
 .vid-thumb img{width:100%;height:100%;object-fit:cover;display:block;opacity:.82;transition:opacity .2s;}
@@ -132,7 +132,7 @@ body{display:flex;flex-direction:column;}
   <button class="reset-btn" onclick="resetView()">⌖ RESET</button>
 </div>
 
-<div class="overlay" id="overlay" onclick="maybeClose(event)">
+<div class="overlay" id="overlay" >
   <div class="panel" id="panel">
     <div class="drag-handle"></div>
     <div class="phdr">
@@ -994,20 +994,22 @@ function openPanel(id) {
   const vidEl=document.getElementById('pVid');
   if (move&&move.vid) {
     vidEl.style.display='';
-    const _vid=move.vid;
+    window._currentVidId = move.vid.id;
+    window._currentVidSrc = move.vid.src;
     vidEl.innerHTML=`
-      <button class="vid-thumb"
-        onclick="(function(wrap,id){
-          wrap.innerHTML='<iframe src=\'https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&modestbranding=1\' allow=\'autoplay; encrypted-media; picture-in-picture\' allowfullscreen></iframe>';
-        })(this.parentNode,'${_vid.id}')">
-        <img src="https://img.youtube.com/vi/${_vid.id}/hqdefault.jpg" alt="Video thumbnail" loading="lazy">
+      <button class="vid-thumb" id="vid-thumb-btn" type="button">
+        <img src="https://img.youtube.com/vi/${move.vid.id}/hqdefault.jpg" alt="Video thumbnail" loading="lazy">
         <div class="vid-play">
           <div class="vid-play-btn"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div>
-          <div class="vid-play-lbl">Tap to play inline</div>
+          <div class="vid-play-lbl">Tap to play</div>
         </div>
         <div class="vid-badge">▶ YouTube</div>
-        <div class="vid-src-lbl">${_vid.src}</div>
+        <div class="vid-src-lbl">${move.vid.src}</div>
       </button>`;
+    // Attach event cleanly after DOM insertion — works on iOS Safari
+    document.getElementById('vid-thumb-btn').addEventListener('click', function() {
+      playVideo(window._currentVidId);
+    });
   } else { vidEl.style.display='none'; }
 
   const ss=move&&move.sensei;
@@ -1033,9 +1035,7 @@ function openPanel(id) {
     document.getElementById('pEscapesList').innerHTML=move.escapes.map(eid=>{
       const em=MOVES.find(m=>m.id===eid);
       if (!em) return '';
-      return `<span class="escape-chip" onclick="closePanel();setTimeout(()=>handleNodeClick('${eid}'),100)">
-        🔵 ${em.label}
-      </span>`;
+      return `<span class="escape-chip" data-escape-id="${eid}">🔵 ${em.label}</span>`;
     }).join('');
   }
 
@@ -1053,9 +1053,9 @@ function renderScores(id) {
   document.getElementById('atkLbl').textContent=sc.e>0?'★'.repeat(sc.e):'—';
   document.getElementById('defLbl').textContent=sc.f>0?'★'.repeat(sc.f):'—';
   document.getElementById('atkStars').innerHTML=[1,2,3,4,5].map(n=>
-    `<div class="star${sc.e>=n?' on':''}" onclick="rate('${id}','e',${n})">⭐</div>`).join('');
+    `<div class="star${sc.e>=n?' on':''}" data-id="${id}" data-type="e" data-val="${n}">⭐</div>`).join('');
   document.getElementById('defStars').innerHTML=[1,2,3,4,5].map(n=>
-    `<div class="star${sc.f>=n?' on':''}" onclick="rate('${id}','f',${n})">🛡️</div>`).join('');
+    `<div class="star${sc.f>=n?' on':''}" data-id="${id}" data-type="f" data-val="${n}">🛡️</div>`).join('');
 }
 function rate(id,t,v){if(!scores[id])scores[id]={e:0,f:0};scores[id][t]=v;renderScores(id);}
 function closePanel(){document.getElementById('overlay').classList.remove('open');}
@@ -1127,6 +1127,44 @@ cw.addEventListener('touchend',()=>{dragging=false;pinching=false;});
 // ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
+// ── EVENT DELEGATION — handles all panel button taps on iOS ──
+// Single listener on document handles: stars, escape chips, close button, overlay dismiss
+document.addEventListener('click', function(e) {
+  // Close button
+  if (e.target.closest('.close-x')) {
+    e.stopPropagation();
+    closePanel();
+    return;
+  }
+  // Overlay backdrop tap to close
+  if (e.target === document.getElementById('overlay')) {
+    closePanel();
+    return;
+  }
+  // Rating stars
+  const star = e.target.closest('.star[data-id]');
+  if (star) {
+    e.stopPropagation();
+    rate(star.dataset.id, star.dataset.type, parseInt(star.dataset.val));
+    return;
+  }
+  // Escape chips
+  const chip = e.target.closest('.escape-chip[data-escape-id]');
+  if (chip) {
+    e.stopPropagation();
+    const eid = chip.dataset.escapeId;
+    closePanel();
+    setTimeout(() => handleNodeClick(eid), 120);
+    return;
+  }
+});
+
+function playVideo(id) {
+  const wrap = document.getElementById('pVid');
+  if (!wrap) return;
+  wrap.innerHTML = '<iframe src="https://www.youtube.com/embed/' + id + '?autoplay=1&rel=0&modestbranding=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+}
+
 function init(){
   const wrap=document.getElementById('canvas-wrap');
   const W=wrap.clientWidth||window.innerWidth;
