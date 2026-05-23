@@ -911,7 +911,7 @@ function render() {
 
     g.style.cursor='pointer';
     g.addEventListener('click',ev=>{ev.stopPropagation();handleNodeClick(n.id);});
-    g.addEventListener('touchend',ev=>{ev.stopPropagation();ev.preventDefault();handleNodeClick(n.id);},{passive:false});
+    g.addEventListener('touchend',ev=>{if(document.getElementById('overlay').classList.contains('open'))return;ev.stopPropagation();ev.preventDefault();handleNodeClick(n.id);},{passive:false});
     nodesLayer.appendChild(g);
   });
 
@@ -955,236 +955,281 @@ function setPlayer(p) {
 const CAT_CLASS={Submission:'pc-sub',Sweep:'pc-swp',Escape:'pc-esc',Takedown:'pc-tkd',Pass:'pc-pas',Control:'pc-ctr'};
 
 function openPanel(id) {
-  const pos  = POSITIONS.find(p=>p.id===id);
-  const move = MOVES.find(m=>m.id===id);
-  const node = pos||move;
+  const pos  = POSITIONS.find(p => p.id === id);
+  const move = MOVES.find(m => m.id === id);
+  const node = pos || move;
   if (!node) return;
 
   const connected = getConnected(id);
-  const connNodes = [...connected].map(cid=>
-    POSITIONS.find(p=>p.id===cid)||MOVES.find(m=>m.id===cid)
-  ).filter(Boolean);
+  const connNodes = [...connected]
+    .map(cid => POSITIONS.find(p => p.id === cid) || MOVES.find(m => m.id === cid))
+    .filter(Boolean);
 
-  const typeEl=document.getElementById('pType');
+  // Type badge
+  const typeEl = document.getElementById('pType');
   if (pos) {
-    typeEl.innerHTML=`<svg width="12" height="12" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="none" stroke="#4a9eff" stroke-width="2"/></svg><span style="color:#4a9eff">Position</span>`;
+    typeEl.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="none" stroke="#4a9eff" stroke-width="2"/></svg><span style="color:#4a9eff">Position</span>';
   } else {
-    const col=CAT_COL[move.cat]||'#e63946';
-    typeEl.innerHTML=`<svg width="12" height="12" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="${col}" stroke-width="2"/></svg><span style="color:${col}">${move.cat}</span>`;
+    const col = CAT_COL[move.cat] || '#e63946';
+    typeEl.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="' + col + '" stroke-width="2"/></svg><span style="color:' + col + '">' + move.cat + '</span>';
   }
 
-  document.getElementById('pTitle').textContent=node.label;
-  document.getElementById('pSubtitle').textContent=node.desc||'';
+  // Title and subtitle
+  document.getElementById('pTitle').textContent    = node.label;
+  document.getElementById('pSubtitle').textContent = node.desc || '';
 
-  const chipsEl=document.getElementById('pChips');
+  // Chips
+  const chipsEl = document.getElementById('pChips');
+  const playerLabel = node.player === 'both' ? 'Both' : node.player === 'top' ? '⬆ Top' : '⬇ Bottom';
   if (pos) {
-    chipsEl.innerHTML=`<span class="pc pc-pos">Position</span><span class="pc pc-ctr">${pos.player==='both'?'Both':pos.player==='top'?'⬆ Top':'⬇ Bottom'}</span>`;
+    chipsEl.innerHTML = '<span class="pc pc-pos">Position</span><span class="pc pc-ctr">' + playerLabel + '</span>';
   } else {
-    chipsEl.innerHTML=`<span class="pc ${CAT_CLASS[move.cat]||'pc-ctr'}">${move.cat}</span><span class="pc pc-ctr">${move.player==='both'?'Both':move.player==='top'?'⬆ Top':'⬇ Bottom'}</span>`;
-    // Landing positions
-    if (move.to&&move.to.length>0) {
-      const landNames=move.to.map(tid=>{
-        const pn=POSITIONS.find(p=>p.id===tid);
-        return pn?`<span class="pc pc-pos">→ ${pn.label}</span>`:'';
-      }).join('');
-      chipsEl.innerHTML+=landNames;
+    let chips = '<span class="pc ' + (CAT_CLASS[move.cat] || 'pc-ctr') + '">' + move.cat + '</span>';
+    chips += '<span class="pc pc-ctr">' + playerLabel + '</span>';
+    if (move.to && move.to.length > 0) {
+      move.to.forEach(function(tid) {
+        const pn = POSITIONS.find(function(p) { return p.id === tid; });
+        if (pn) chips += '<span class="pc pc-pos">→ ' + pn.label + '</span>';
+      });
     }
+    chipsEl.innerHTML = chips;
   }
 
-  const vidEl=document.getElementById('pVid');
-  if (move&&move.vid) {
-    vidEl.style.display='';
-    window._currentVidId = move.vid.id;
-    window._currentVidSrc = move.vid.src;
-    vidEl.innerHTML=`
-      <button class="vid-thumb" id="vid-thumb-btn" type="button">
-        <img src="https://img.youtube.com/vi/${move.vid.id}/hqdefault.jpg" alt="Video thumbnail" loading="lazy">
-        <div class="vid-play">
-          <div class="vid-play-btn"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div>
-          <div class="vid-play-lbl">Tap to play</div>
-        </div>
-        <div class="vid-badge">▶ YouTube</div>
-        <div class="vid-src-lbl">${move.vid.src}</div>
-      </button>`;
-    // Attach event cleanly after DOM insertion — works on iOS Safari
+  // Video — only for moves with a vid field
+  const vidEl = document.getElementById('pVid');
+  if (move && move.vid) {
+    vidEl.style.display = '';
+    const vidId  = move.vid.id;
+    const vidSrc = move.vid.src;
+    vidEl.innerHTML =
+      '<button class="vid-thumb" id="vid-thumb-btn" type="button">' +
+        '<img src="https://img.youtube.com/vi/' + vidId + '/hqdefault.jpg" alt="Video thumbnail" loading="lazy">' +
+        '<div class="vid-play">' +
+          '<div class="vid-play-btn"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div>' +
+          '<div class="vid-play-lbl">Tap to play</div>' +
+        '</div>' +
+        '<div class="vid-badge">▶ YouTube</div>' +
+        '<div class="vid-src-lbl">' + vidSrc + '</div>' +
+      '</button>';
     document.getElementById('vid-thumb-btn').addEventListener('click', function() {
-      playVideo(window._currentVidId);
+      document.getElementById('pVid').innerHTML =
+        '<iframe src="https://www.youtube-nocookie.com/embed/' + vidId +
+        '?rel=0&modestbranding=1&playsinline=1" allow="encrypted-media; picture-in-picture" allowfullscreen ' +
+        'style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>';
     });
-  } else { vidEl.style.display='none'; }
+  } else {
+    vidEl.style.display = 'none';
+  }
 
-  const ss=move&&move.sensei;
-  document.getElementById('senseiLbl').style.display=ss?'':'none';
-  document.getElementById('pSenseiBlk').style.display=ss?'':'none';
-  if (ss) document.getElementById('pSenseiTxt').textContent=move.sensei;
+  // Sensei block
+  const hasSensei = !!(move && move.sensei);
+  document.getElementById('senseiLbl').style.display  = hasSensei ? '' : 'none';
+  document.getElementById('pSenseiBlk').style.display = hasSensei ? '' : 'none';
+  if (hasSensei) document.getElementById('pSenseiTxt').textContent = move.sensei;
 
-  const st=move&&move.steps;
-  document.getElementById('stepsLbl').style.display=st?'':'none';
-  document.getElementById('pSteps').innerHTML=st
-    ?move.steps.map((s,i)=>`<li><div class="sn">${i+1}</div><div>${s}</div></li>`).join(''):'';
+  // Steps
+  const hasSteps = !!(move && move.steps && move.steps.length);
+  document.getElementById('stepsLbl').style.display = hasSteps ? '' : 'none';
+  document.getElementById('pSteps').innerHTML = hasSteps
+    ? move.steps.map(function(s, i) { return '<li><div class="sn">' + (i+1) + '</div><div>' + s + '</div></li>'; }).join('')
+    : '';
 
-  const er=move&&move.errs;
-  document.getElementById('errsLbl').style.display=er?'':'none';
-  document.getElementById('pErrsBlk').style.display=er?'':'none';
-  if (er) document.getElementById('pErrsList').innerHTML=move.errs.map(e=>`<div class="err-row">${e}</div>`).join('');
+  // Mistakes
+  const hasErrs = !!(move && move.errs && move.errs.length);
+  document.getElementById('errsLbl').style.display  = hasErrs ? '' : 'none';
+  document.getElementById('pErrsBlk').style.display = hasErrs ? '' : 'none';
+  if (hasErrs) {
+    document.getElementById('pErrsList').innerHTML =
+      move.errs.map(function(e) { return '<div class="err-row">' + e + '</div>'; }).join('');
+  }
 
-  // Submission escapes section
-  const hasEscapes=move&&move.cat==='Submission'&&move.escapes&&move.escapes.length>0;
-  document.getElementById('escapesLbl').style.display=hasEscapes?'':'none';
-  document.getElementById('pEscapesBlk').style.display=hasEscapes?'':'none';
+  // Submission escapes
+  const hasEscapes = !!(move && move.cat === 'Submission' && move.escapes && move.escapes.length);
+  document.getElementById('escapesLbl').style.display  = hasEscapes ? '' : 'none';
+  document.getElementById('pEscapesBlk').style.display = hasEscapes ? '' : 'none';
   if (hasEscapes) {
-    document.getElementById('pEscapesList').innerHTML=move.escapes.map(eid=>{
-      const em=MOVES.find(m=>m.id===eid);
-      if (!em) return '';
-      return `<span class="escape-chip" data-escape-id="${eid}">🔵 ${em.label}</span>`;
+    document.getElementById('pEscapesList').innerHTML = move.escapes.map(function(eid) {
+      const em = MOVES.find(function(m) { return m.id === eid; });
+      return em ? '<span class="escape-chip" data-escape-id="' + eid + '">🔵 ' + em.label + '</span>' : '';
     }).join('');
   }
 
-  // Connected nodes
-  document.getElementById('pConnected').innerHTML=
-    connNodes.map(cn=>`<span class="conn-chip">${cn.label}</span>`).join('');
+  // Connected chips
+  document.getElementById('pConnected').innerHTML =
+    connNodes.map(function(cn) { return '<span class="conn-chip">' + cn.label + '</span>'; }).join('');
 
+  // Scores
   renderScores(id);
+
+  // Show panel
   document.getElementById('overlay').classList.add('open');
-  document.getElementById('panel').scrollTop=0;
+  document.getElementById('panel').scrollTop = 0;
 }
 
 function renderScores(id) {
-  const sc=scores[id]||{e:0,f:0};
-  document.getElementById('atkLbl').textContent=sc.e>0?'★'.repeat(sc.e):'—';
-  document.getElementById('defLbl').textContent=sc.f>0?'★'.repeat(sc.f):'—';
-  document.getElementById('atkStars').innerHTML=[1,2,3,4,5].map(n=>
-    `<div class="star${sc.e>=n?' on':''}" data-id="${id}" data-type="e" data-val="${n}">⭐</div>`).join('');
-  document.getElementById('defStars').innerHTML=[1,2,3,4,5].map(n=>
-    `<div class="star${sc.f>=n?' on':''}" data-id="${id}" data-type="f" data-val="${n}">🛡️</div>`).join('');
+  const sc = scores[id] || { e: 0, f: 0 };
+  document.getElementById('atkLbl').textContent = sc.e > 0 ? '★'.repeat(sc.e) : '—';
+  document.getElementById('defLbl').textContent = sc.f > 0 ? '★'.repeat(sc.f) : '—';
+  document.getElementById('atkStars').innerHTML = [1,2,3,4,5].map(function(n) {
+    return '<div class="star' + (sc.e >= n ? ' on' : '') + '" data-id="' + id + '" data-type="e" data-val="' + n + '">⭐</div>';
+  }).join('');
+  document.getElementById('defStars').innerHTML = [1,2,3,4,5].map(function(n) {
+    return '<div class="star' + (sc.f >= n ? ' on' : '') + '" data-id="' + id + '" data-type="f" data-val="' + n + '">🛡️</div>';
+  }).join('');
 }
-function rate(id,t,v){if(!scores[id])scores[id]={e:0,f:0};scores[id][t]=v;renderScores(id);}
-function closePanel(){
-  // Stop any playing video by removing the iframe completely
-  const vidWrap = document.getElementById('pVid');
-  if (vidWrap) vidWrap.innerHTML = '';
+
+function rate(id, t, v) {
+  if (!scores[id]) scores[id] = { e: 0, f: 0 };
+  scores[id][t] = v;
+  renderScores(id);
+}
+
+function closePanel() {
+  // Stop video by wiping the container
+  const vidEl = document.getElementById('pVid');
+  if (vidEl) vidEl.innerHTML = '';
   document.getElementById('overlay').classList.remove('open');
 }
-function maybeClose(e){if(e.target===document.getElementById('overlay'))closePanel();}
 
-// ═══════════════════════════════════════════════════════
-// PAN & ZOOM
-// ═══════════════════════════════════════════════════════
-function doZoom(factor,px,py){
-  const wrap=document.getElementById('canvas-wrap');
-  if(px===undefined){px=wrap.clientWidth/2;py=wrap.clientHeight/2;}
-  const ns=Math.max(0.2,Math.min(5,ts*factor));
-  tx=px-(px-tx)*(ns/ts); ty=py-(py-ty)*(ns/ts); ts=ns; render();
+// ── PAN & ZOOM ──
+function doZoom(factor, px, py) {
+  const wrap = document.getElementById('canvas-wrap');
+  if (px === undefined) { px = wrap.clientWidth / 2; py = wrap.clientHeight / 2; }
+  const ns = Math.max(0.2, Math.min(5, ts * factor));
+  tx = px - (px - tx) * (ns / ts);
+  ty = py - (py - ty) * (ns / ts);
+  ts = ns;
+  render();
 }
-function centreView(){
-  if(!simNodes)return;
-  const wrap=document.getElementById('canvas-wrap');
-  const W=wrap.clientWidth,H=wrap.clientHeight;
-  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
-  simNodes.filter(nodeVisible).forEach(n=>{
-    x0=Math.min(x0,n.x-n.r*4);x1=Math.max(x1,n.x+n.r*4);
-    y0=Math.min(y0,n.y-n.r*4);y1=Math.max(y1,n.y+n.r*4);
+
+function centreView() {
+  if (!simNodes) return;
+  const wrap = document.getElementById('canvas-wrap');
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  simNodes.filter(nodeVisible).forEach(function(n) {
+    x0 = Math.min(x0, n.x - n.r*4); x1 = Math.max(x1, n.x + n.r*4);
+    y0 = Math.min(y0, n.y - n.r*4); y1 = Math.max(y1, n.y + n.r*4);
   });
-  const gW=x1-x0,gH=y1-y0;
-  ts=Math.min(W/gW,H/gH)*0.9;
-  tx=(W-gW*ts)/2-x0*ts; ty=(H-gH*ts)/2-y0*ts;
+  const gW = x1 - x0, gH = y1 - y0;
+  ts = Math.min(W / gW, H / gH) * 0.9;
+  tx = (W - gW * ts) / 2 - x0 * ts;
+  ty = (H - gH * ts) / 2 - y0 * ts;
 }
-function resetView(){focusedId=null;centreView();render();}
 
-const cw=document.getElementById('canvas-wrap');
-cw.addEventListener('mousedown',e=>{
-  if(e.target.closest('.ctrl-btn,.reset-btn'))return;
-  dragging=true;lx=e.clientX;ly=e.clientY;cw.classList.add('grabbing');
-});
-window.addEventListener('mousemove',e=>{
-  if(!dragging)return;
-  tx+=e.clientX-lx;ty+=e.clientY-ly;lx=e.clientX;ly=e.clientY;render();
-});
-window.addEventListener('mouseup',()=>{dragging=false;cw.classList.remove('grabbing');});
-cw.addEventListener('wheel',e=>{
-  e.preventDefault();
-  const r=cw.getBoundingClientRect();
-  doZoom(e.deltaY<0?1.1:0.9,e.clientX-r.left,e.clientY-r.top);
-},{passive:false});
-cw.addEventListener('touchstart',e=>{
-  if(e.touches.length===1){
-    const t=e.touches[0];
-    if(t.target.closest('.ctrl-btn,.reset-btn'))return;
-    dragging=true;lx=t.clientX;ly=t.clientY;
-  }else if(e.touches.length===2){
-    dragging=false;pinching=true;
-    lpd=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-  }
-},{passive:true});
-cw.addEventListener('touchmove',e=>{
-  e.preventDefault();
-  if(e.touches.length===1&&dragging){
-    tx+=e.touches[0].clientX-lx;ty+=e.touches[0].clientY-ly;
-    lx=e.touches[0].clientX;ly=e.touches[0].clientY;render();
-  }else if(e.touches.length===2&&pinching){
-    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-    const r=cw.getBoundingClientRect();
-    doZoom(d/lpd,(e.touches[0].clientX+e.touches[1].clientX)/2-r.left,(e.touches[0].clientY+e.touches[1].clientY)/2-r.top);
-    lpd=d;
-  }
-},{passive:false});
-cw.addEventListener('touchend',()=>{dragging=false;pinching=false;});
+function resetView() { focusedId = null; centreView(); render(); }
 
-// ═══════════════════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════════════════
-// ── EVENT DELEGATION — handles all panel button taps on iOS ──
-// Single listener on document handles: stars, escape chips, close button, overlay dismiss
+// ── TOUCH & MOUSE ──
+const cw = document.getElementById('canvas-wrap');
+
+function panelOpen() {
+  return document.getElementById('overlay').classList.contains('open');
+}
+
+cw.addEventListener('mousedown', function(e) {
+  if (e.target.closest('.ctrl-btn, .reset-btn')) return;
+  dragging = true; lx = e.clientX; ly = e.clientY;
+  cw.classList.add('grabbing');
+});
+window.addEventListener('mousemove', function(e) {
+  if (!dragging) return;
+  tx += e.clientX - lx; ty += e.clientY - ly;
+  lx = e.clientX; ly = e.clientY; render();
+});
+window.addEventListener('mouseup', function() { dragging = false; cw.classList.remove('grabbing'); });
+
+cw.addEventListener('wheel', function(e) {
+  e.preventDefault();
+  const r = cw.getBoundingClientRect();
+  doZoom(e.deltaY < 0 ? 1.1 : 0.9, e.clientX - r.left, e.clientY - r.top);
+}, { passive: false });
+
+cw.addEventListener('touchstart', function(e) {
+  if (panelOpen()) return;
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    if (t.target.closest('.ctrl-btn, .reset-btn')) return;
+    dragging = true; lx = t.clientX; ly = t.clientY;
+  } else if (e.touches.length === 2) {
+    dragging = false; pinching = true;
+    lpd = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+  }
+}, { passive: true });
+
+cw.addEventListener('touchmove', function(e) {
+  if (panelOpen()) return;
+  e.preventDefault();
+  if (e.touches.length === 1 && dragging) {
+    tx += e.touches[0].clientX - lx; ty += e.touches[0].clientY - ly;
+    lx = e.touches[0].clientX; ly = e.touches[0].clientY; render();
+  } else if (e.touches.length === 2 && pinching) {
+    const d = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    const r = cw.getBoundingClientRect();
+    doZoom(d / lpd,
+      (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left,
+      (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top
+    );
+    lpd = d;
+  }
+}, { passive: false });
+
+cw.addEventListener('touchend', function() { dragging = false; pinching = false; });
+
+// ── EVENT DELEGATION — single listener for all panel buttons ──
 document.addEventListener('click', function(e) {
-  // Close button — match by id or class
-  if (e.target.closest('.close-x') || e.target.closest('#close-panel-btn')) {
-    e.stopPropagation();
+  // Close button
+  if (e.target.closest('#close-panel-btn')) {
     closePanel();
     return;
   }
-  // Overlay backdrop tap to close
-  if (e.target === document.getElementById('overlay')) {
+  // Overlay background tap
+  if (e.target.id === 'overlay') {
     closePanel();
     return;
   }
   // Rating stars
   const star = e.target.closest('.star[data-id]');
   if (star) {
-    e.stopPropagation();
     rate(star.dataset.id, star.dataset.type, parseInt(star.dataset.val));
     return;
   }
   // Escape chips
   const chip = e.target.closest('.escape-chip[data-escape-id]');
   if (chip) {
-    e.stopPropagation();
     const eid = chip.dataset.escapeId;
     closePanel();
-    setTimeout(() => handleNodeClick(eid), 120);
+    setTimeout(function() { handleNodeClick(eid); }, 150);
     return;
   }
 });
 
-function playVideo(id) {
-  const wrap = document.getElementById('pVid');
-  if (!wrap) return;
-  // Use youtube-nocookie for privacy + no autoplay (blocked in iOS PWA standalone mode)
-  // YouTube renders its own native play button — tap it to play inside the panel
-  wrap.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + id + '?rel=0&modestbranding=1&playsinline=1" allow="encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>';
+// ── INIT ──
+function init() {
+  const wrap = document.getElementById('canvas-wrap');
+  const W = wrap.clientWidth || window.innerWidth;
+  const H = (wrap.clientHeight || window.innerHeight) - 100;
+  simNodes = buildNodes(W * 1.25, H * 1.25);
+  simNodes = forceLayout(simNodes, W * 1.25, H * 1.25, 420);
+  centreView();
+  render();
 }
 
-function init(){
-  const wrap=document.getElementById('canvas-wrap');
-  const W=wrap.clientWidth||window.innerWidth;
-  const H=(wrap.clientHeight||window.innerHeight)-100;
-  simNodes=buildNodes(W*1.25,H*1.25);
-  simNodes=forceLayout(simNodes,W*1.25,H*1.25,420);
-  centreView(); render();
+window.addEventListener('resize', function() { centreView(); render(); });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/bjj-graph/sw.js').catch(function() {});
+  });
 }
-window.addEventListener('resize',()=>{centreView();render();});
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('/bjj-graph/sw.js').catch(()=>{}));
-}
+
 init();
+
 </script>
 </body>
 </html>
