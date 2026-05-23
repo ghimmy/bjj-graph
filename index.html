@@ -911,7 +911,7 @@ function render() {
 
     g.style.cursor='pointer';
     g.addEventListener('click',ev=>{ev.stopPropagation();handleNodeClick(n.id);});
-    g.addEventListener('touchend',ev=>{if(document.getElementById('overlay').classList.contains('open'))return;ev.stopPropagation();ev.preventDefault();handleNodeClick(n.id);},{passive:false});
+    g.addEventListener('touchend',ev=>{ev.stopPropagation();ev.preventDefault();handleNodeClick(n.id);},{passive:false});
     nodesLayer.appendChild(g);
   });
 
@@ -955,7 +955,6 @@ function setPlayer(p) {
 const CAT_CLASS={Submission:'pc-sub',Sweep:'pc-swp',Escape:'pc-esc',Takedown:'pc-tkd',Pass:'pc-pas',Control:'pc-ctr'};
 
 function openPanel(id) {
-  try {
   const pos  = POSITIONS.find(p=>p.id===id);
   const move = MOVES.find(m=>m.id===id);
   const node = pos||move;
@@ -1007,13 +1006,10 @@ function openPanel(id) {
         <div class="vid-badge">▶ YouTube</div>
         <div class="vid-src-lbl">${move.vid.src}</div>
       </button>`;
-    // Attach event cleanly after DOM insertion — guard against null
-    const thumbBtn = document.getElementById('vid-thumb-btn');
-    if (thumbBtn) {
-      thumbBtn.addEventListener('click', function() {
-        playVideo(window._currentVidId);
-      });
-    }
+    // Attach event cleanly after DOM insertion — works on iOS Safari
+    document.getElementById('vid-thumb-btn').addEventListener('click', function() {
+      playVideo(window._currentVidId);
+    });
   } else { vidEl.style.display='none'; }
 
   const ss=move&&move.sensei;
@@ -1050,11 +1046,9 @@ function openPanel(id) {
   renderScores(id);
   document.getElementById('overlay').classList.add('open');
   document.getElementById('panel').scrollTop=0;
-  } catch(err) { console.error('openPanel error:', err); }
 }
 
 function renderScores(id) {
-  try {
   const sc=scores[id]||{e:0,f:0};
   document.getElementById('atkLbl').textContent=sc.e>0?'★'.repeat(sc.e):'—';
   document.getElementById('defLbl').textContent=sc.f>0?'★'.repeat(sc.f):'—';
@@ -1062,8 +1056,6 @@ function renderScores(id) {
     `<div class="star${sc.e>=n?' on':''}" data-id="${id}" data-type="e" data-val="${n}">⭐</div>`).join('');
   document.getElementById('defStars').innerHTML=[1,2,3,4,5].map(n=>
     `<div class="star${sc.f>=n?' on':''}" data-id="${id}" data-type="f" data-val="${n}">🛡️</div>`).join('');
-}
-  } catch(err){console.error('renderScores error:',err);}
 }
 function rate(id,t,v){if(!scores[id])scores[id]={e:0,f:0};scores[id][t]=v;renderScores(id);}
 function closePanel(){
@@ -1114,8 +1106,6 @@ cw.addEventListener('wheel',e=>{
   doZoom(e.deltaY<0?1.1:0.9,e.clientX-r.left,e.clientY-r.top);
 },{passive:false});
 cw.addEventListener('touchstart',e=>{
-  // Don't handle canvas touches when panel is open
-  if(document.getElementById('overlay').classList.contains('open'))return;
   if(e.touches.length===1){
     const t=e.touches[0];
     if(t.target.closest('.ctrl-btn,.reset-btn'))return;
@@ -1126,7 +1116,6 @@ cw.addEventListener('touchstart',e=>{
   }
 },{passive:true});
 cw.addEventListener('touchmove',e=>{
-  if(document.getElementById('overlay').classList.contains('open'))return;
   e.preventDefault();
   if(e.touches.length===1&&dragging){
     tx+=e.touches[0].clientX-lx;ty+=e.touches[0].clientY-ly;
