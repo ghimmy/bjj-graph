@@ -140,7 +140,7 @@ body{display:flex;flex-direction:column;}
       <div class="ptitle" id="pTitle"></div>
       <div class="psubtitle" id="pSubtitle"></div>
       <div class="pchips" id="pChips"></div>
-      <button class="close-x" onclick="closePanel()">✕</button>
+      <button class="close-x" id="close-panel-btn" type="button">✕</button>
     </div>
     <div class="vid-wrap" id="pVid"></div>
     <div class="pbody">
@@ -1058,7 +1058,12 @@ function renderScores(id) {
     `<div class="star${sc.f>=n?' on':''}" data-id="${id}" data-type="f" data-val="${n}">🛡️</div>`).join('');
 }
 function rate(id,t,v){if(!scores[id])scores[id]={e:0,f:0};scores[id][t]=v;renderScores(id);}
-function closePanel(){document.getElementById('overlay').classList.remove('open');}
+function closePanel(){
+  // Stop any playing video by removing the iframe completely
+  const vidWrap = document.getElementById('pVid');
+  if (vidWrap) vidWrap.innerHTML = '';
+  document.getElementById('overlay').classList.remove('open');
+}
 function maybeClose(e){if(e.target===document.getElementById('overlay'))closePanel();}
 
 // ═══════════════════════════════════════════════════════
@@ -1130,8 +1135,8 @@ cw.addEventListener('touchend',()=>{dragging=false;pinching=false;});
 // ── EVENT DELEGATION — handles all panel button taps on iOS ──
 // Single listener on document handles: stars, escape chips, close button, overlay dismiss
 document.addEventListener('click', function(e) {
-  // Close button
-  if (e.target.closest('.close-x')) {
+  // Close button — match by id or class
+  if (e.target.closest('.close-x') || e.target.closest('#close-panel-btn')) {
     e.stopPropagation();
     closePanel();
     return;
@@ -1162,7 +1167,9 @@ document.addEventListener('click', function(e) {
 function playVideo(id) {
   const wrap = document.getElementById('pVid');
   if (!wrap) return;
-  wrap.innerHTML = '<iframe src="https://www.youtube.com/embed/' + id + '?autoplay=1&rel=0&modestbranding=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+  // Use youtube-nocookie for privacy + no autoplay (blocked in iOS PWA standalone mode)
+  // YouTube renders its own native play button — tap it to play inside the panel
+  wrap.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + id + '?rel=0&modestbranding=1&playsinline=1" allow="encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>';
 }
 
 function init(){
