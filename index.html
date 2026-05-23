@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BJJ Graph</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d0f0e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BJJ Graph">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#0d0f0e;--surface:#131614;--border:#1e2320;
+  --pos-color:#4a9eff;--move-color:#e63946;--connected-color:#f4a261;
+  --text-primary:#dde3de;--text-muted:#5a6b5c;
+}
+html,body{height:100%;background:var(--bg);font-family:'Source Sans 3',sans-serif;overflow:hidden;color:var(--text-primary);}
+body{display:flex;flex-direction:column;}
+.hdr{background:rgba(13,15,14,0.97);border-bottom:1px solid var(--border);padding:10px 16px 8px;flex-shrink:0;z-index:100;backdrop-filter:blur(12px);}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.brand{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;letter-spacing:2px;color:var(--text-primary);}
+.brand em{color:var(--move-color);font-style:normal;}
+.legend{display:flex;gap:12px;align-items:center;}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);}
+.leg-circle{width:10px;height:10px;border-radius:50%;background:var(--move-color);}
+.leg-tri{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid var(--pos-color);}
+.toggle-row{display:flex;gap:8px;}
+.tbtn{flex:1;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);background:transparent;cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);transition:all .2s;}
+.tbtn.a-top{border-color:var(--move-color);color:var(--move-color);background:rgba(230,57,70,0.1);box-shadow:0 0 16px rgba(230,57,70,0.15);}
+.tbtn.a-bot{border-color:var(--pos-color);color:var(--pos-color);background:rgba(74,158,255,0.1);box-shadow:0 0 16px rgba(74,158,255,0.15);}
+#canvas-wrap{flex:1;position:relative;overflow:hidden;touch-action:none;cursor:grab;}
+#canvas-wrap.grabbing{cursor:grabbing;}
+#graph-svg{position:absolute;top:0;left:0;width:100%;height:100%;}
+.controls{position:absolute;bottom:20px;right:16px;display:flex;flex-direction:column;gap:6px;z-index:50;}
+.ctrl-btn{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:rgba(19,22,20,0.92);color:var(--text-muted);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);transition:all .15s;}
+.ctrl-btn:hover{border-color:var(--move-color);color:var(--text-primary);}
+.reset-btn{position:absolute;bottom:20px;left:16px;z-index:50;background:rgba(19,22,20,0.92);border:1px solid var(--border);border-radius:10px;padding:8px 14px;font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);cursor:pointer;backdrop-filter:blur(8px);transition:all .15s;}
+.reset-btn:hover{border-color:var(--text-muted);color:var(--text-primary);}
+.overlay{position:fixed;inset:0;z-index:200;pointer-events:none;transition:background .28s;}
+.overlay.open{pointer-events:all;background:rgba(0,0,0,.72);}
+.panel{position:absolute;bottom:0;left:0;right:0;background:var(--surface);border-radius:18px 18px 0 0;border-top:1px solid var(--border);max-height:84vh;overflow-y:auto;-webkit-overflow-scrolling:touch;transform:translateY(100%);transition:transform .34s cubic-bezier(.32,.72,0,1);box-shadow:0 -8px 48px rgba(0,0,0,.6);}
+.panel::-webkit-scrollbar{display:none;}
+.overlay.open .panel{transform:translateY(0);}
+.drag-handle{width:32px;height:3px;background:var(--border);border-radius:2px;margin:12px auto 0;}
+.phdr{padding:14px 18px 0;position:relative;}
+.pnode-type{display:inline-flex;align-items:center;gap:7px;font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;}
+.ptitle{font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;letter-spacing:.5px;color:var(--text-primary);margin-bottom:4px;}
+.psubtitle{font-size:13px;color:var(--text-muted);margin-bottom:12px;line-height:1.5;}
+.pchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+.pc{font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:4px;}
+.pc-sub{background:rgba(230,57,70,0.15);color:#e63946;border:1px solid rgba(230,57,70,0.3);}
+.pc-swp{background:rgba(244,162,97,0.15);color:#f4a261;border:1px solid rgba(244,162,97,0.3);}
+.pc-esc{background:rgba(74,158,255,0.15);color:#4a9eff;border:1px solid rgba(74,158,255,0.3);}
+.pc-tkd{background:rgba(160,210,80,0.15);color:#a0d250;border:1px solid rgba(160,210,80,0.3);}
+.pc-pas{background:rgba(180,120,255,0.15);color:#b478ff;border:1px solid rgba(180,120,255,0.3);}
+.pc-pos{background:rgba(74,158,255,0.12);color:#4a9eff;border:1px solid rgba(74,158,255,0.25);}
+.pc-ctr{background:rgba(255,255,255,0.06);color:var(--text-muted);border:1px solid var(--border);}
+.close-x{position:absolute;top:12px;right:16px;width:28px;height:28px;border-radius:6px;background:var(--border);border:none;cursor:pointer;font-size:13px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;}
+.vid-wrap{margin:0 18px 14px;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:16/9;position:relative;}
+.vid-thumb{width:100%;height:100%;position:relative;cursor:pointer;display:block;border:none;padding:0;background:#111;}
+.vid-thumb img{width:100%;height:100%;object-fit:cover;display:block;opacity:.82;transition:opacity .2s;}
+.vid-thumb:hover img,.vid-thumb:active img{opacity:1;}
+.vid-play{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;}
+.vid-play-btn{width:62px;height:62px;background:rgba(230,57,70,.92);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 24px rgba(230,57,70,.55);transition:transform .15s;}
+.vid-thumb:hover .vid-play-btn{transform:scale(1.08);}
+.vid-play-btn svg{width:24px;height:24px;fill:#fff;margin-left:4px;}
+.vid-play-lbl{color:#fff;font-size:10px;font-weight:600;letter-spacing:.5px;font-family:'Rajdhani',sans-serif;text-transform:uppercase;background:rgba(0,0,0,.52);padding:3px 11px;border-radius:20px;}
+.vid-badge{position:absolute;bottom:7px;right:8px;background:rgba(0,0,0,.68);color:#fff;font-size:8px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:1px;font-family:'Rajdhani',sans-serif;pointer-events:none;}
+.vid-src-lbl{position:absolute;bottom:7px;left:8px;background:rgba(0,0,0,.58);color:#bbb;font-size:8px;padding:2px 6px;border-radius:3px;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;}
+.vid-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:none;display:block;}
+.vid-ph{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-muted);gap:8px;font-size:13px;background:var(--border);min-height:140px;}
+.pbody{padding:0 18px 40px;}
+.section-lbl{font-family:'Rajdhani',sans-serif;font-size:9px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;margin-top:16px;}
+.sensei-blk{background:rgba(244,162,97,0.06);border:1px solid rgba(244,162,97,0.15);border-left:3px solid #f4a261;border-radius:0 8px 8px 0;padding:12px 14px;}
+.sensei-txt{font-size:13.5px;font-style:italic;line-height:1.75;color:#c0c8c1;}
+.steps{list-style:none;}
+.steps li{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;line-height:1.55;color:#a8b0a9;}
+.steps li:last-child{border-bottom:none;}
+.sn{width:18px;height:18px;border-radius:4px;background:var(--border);color:var(--text-muted);font-family:'Rajdhani',sans-serif;font-size:9px;font-weight:700;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:2px;}
+.err-blk{background:rgba(230,57,70,0.06);border:1px solid rgba(230,57,70,0.15);border-left:3px solid #e63946;border-radius:0 8px 8px 0;padding:10px 12px;}
+.err-row{font-size:12.5px;color:#9a6068;line-height:1.55;padding:2px 0;display:flex;gap:8px;}
+.err-row::before{content:'×';flex-shrink:0;color:#e63946;font-weight:700;}
+.escape-blk{background:rgba(74,158,255,0.06);border:1px solid rgba(74,158,255,0.15);border-left:3px solid #4a9eff;border-radius:0 8px 8px 0;padding:10px 12px;}
+.escape-chip{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;letter-spacing:.5px;padding:4px 10px;border-radius:5px;border:1px solid rgba(74,158,255,0.25);color:#4a9eff;background:rgba(74,158,255,0.08);font-family:'Rajdhani',sans-serif;text-transform:uppercase;margin:3px 3px 0 0;cursor:pointer;}
+.escape-chip:hover{background:rgba(74,158,255,0.15);}
+.conn-chips{display:flex;gap:6px;flex-wrap:wrap;}
+.conn-chip{font-size:10px;font-weight:600;letter-spacing:.5px;padding:4px 10px;border-radius:5px;border:1px solid var(--border);color:var(--text-muted);background:rgba(255,255,255,0.03);font-family:'Rajdhani',sans-serif;text-transform:uppercase;}
+.sc-row{margin-bottom:8px;}
+.sc-lbl-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.sc-lbl{font-family:'Rajdhani',sans-serif;font-size:9px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);}
+.sc-val{font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:#f4a261;}
+.stars{display:flex;gap:5px;}
+.star{width:34px;height:34px;border-radius:7px;border:1px solid var(--border);background:transparent;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .12s;}
+.star.on{background:rgba(244,162,97,0.12);border-color:rgba(244,162,97,0.4);}
+.star:active{transform:scale(.88);}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="hdr-top">
+    <div class="brand">BJJ <em>GRAPH</em></div>
+    <div class="legend">
+      <div class="leg-item"><div class="leg-tri"></div>Position</div>
+      <div class="leg-item"><div class="leg-circle"></div>Move</div>
+    </div>
+  </div>
+  <div class="toggle-row">
+    <button class="tbtn a-top" id="btn-top" onclick="setPlayer('top')">⬆ Top Game</button>
+    <button class="tbtn" id="btn-bot" onclick="setPlayer('bottom')">⬇ Bottom Game</button>
+    <button class="tbtn" id="btn-all" onclick="setPlayer('all')" style="flex:0.6">All</button>
+  </div>
+</div>
+<div id="canvas-wrap">
+  <svg id="graph-svg" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="glow-red"   x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur in="SourceGraphic" stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <filter id="glow-blue"  x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <filter id="glow-amber" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <filter id="glow-green" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <g id="edges-layer"></g>
+    <g id="nodes-layer"></g>
+  </svg>
+  <div class="controls">
+    <button class="ctrl-btn" onclick="doZoom(1.25)">+</button>
+    <button class="ctrl-btn" onclick="doZoom(0.8)">−</button>
+  </div>
+  <button class="reset-btn" onclick="resetView()">⌖ RESET</button>
+</div>
+
+<div class="overlay" id="overlay" onclick="maybeClose(event)">
+  <div class="panel" id="panel">
+    <div class="drag-handle"></div>
+    <div class="phdr">
+      <div class="pnode-type" id="pType"></div>
+      <div class="ptitle" id="pTitle"></div>
+      <div class="psubtitle" id="pSubtitle"></div>
+      <div class="pchips" id="pChips"></div>
+      <button class="close-x" onclick="closePanel()">✕</button>
+    </div>
+    <div class="vid-wrap" id="pVid"></div>
+    <div class="pbody">
+      <div class="section-lbl" id="senseiLbl" style="display:none">🥋 Black Belt Insight</div>
+      <div class="sensei-blk" id="pSenseiBlk" style="display:none"><div class="sensei-txt" id="pSenseiTxt"></div></div>
+      <div class="section-lbl" id="stepsLbl" style="display:none">Execution</div>
+      <ul class="steps" id="pSteps"></ul>
+      <div class="section-lbl" id="errsLbl" style="display:none">White Belt Mistakes</div>
+      <div class="err-blk" id="pErrsBlk" style="display:none"><div id="pErrsList"></div></div>
+      <div class="section-lbl" id="escapesLbl" style="display:none">🔵 Submission Escapes</div>
+      <div class="escape-blk" id="pEscapesBlk" style="display:none"><div id="pEscapesList"></div></div>
+      <div class="section-lbl">Connected Nodes</div>
+      <div class="conn-chips" id="pConnected" style="margin-bottom:16px"></div>
+      <div class="section-lbl">Rate Your Skill</div>
+      <div class="sc-row">
+        <div class="sc-lbl-row"><span class="sc-lbl">Attack / Execution</span><span class="sc-val" id="atkLbl">—</span></div>
+        <div class="stars" id="atkStars"></div>
+      </div>
+      <div class="sc-row">
+        <div class="sc-lbl-row"><span class="sc-lbl">Defense / Escape</span><span class="sc-val" id="defLbl">—</span></div>
+        <div class="stars" id="defStars"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// POSITIONS — 18 triangles
+// group: neutral | top | bottom
+// ═══════════════════════════════════════════════════════
+const POSITIONS = [
+  { id:'standing',     label:'Standing',        desc:'Neutral — both fighters upright',             player:'both',   group:'neutral' },
+  { id:'clinch',       label:'Clinch',           desc:'Upper body contact — takedown range',         player:'both',   group:'neutral' },
+  // Bottom game
+  { id:'closed_guard', label:'Closed Guard',     desc:'Legs locked — full control below',            player:'both',   group:'bottom' },
+  { id:'half_guard',   label:'Half Guard',       desc:'One leg trapped — underhook battle',          player:'both',   group:'bottom' },
+  { id:'deep_half',    label:'Deep Half',        desc:'Far underhook under their lead leg',          player:'bottom', group:'bottom' },
+  { id:'butterfly',    label:'Butterfly Guard',  desc:'Hooks under thighs — elevating guard',        player:'bottom', group:'bottom' },
+  { id:'open_guard',   label:'Open Guard',       desc:'Feet framing — multiple guard options',       player:'bottom', group:'bottom' },
+  { id:'spider_guard', label:'Spider Guard',     desc:'Sleeve grips + feet on biceps',               player:'bottom', group:'bottom' },
+  { id:'dlr',          label:'De La Riva',       desc:'Outside hook on lead leg — off-balance',      player:'bottom', group:'bottom' },
+  { id:'x_guard',      label:'X-Guard',          desc:'Two hooks — opponent has zero base',          player:'bottom', group:'bottom' },
+  { id:'fifty_fifty',  label:'50 / 50',          desc:'Legs intertwined — mutual heel hook range',   player:'both',   group:'bottom' },
+  { id:'leg_ent',      label:'Leg Entangle',     desc:'Outside ashi — heel hook position',           player:'both',   group:'bottom' },
+  // Top game
+  { id:'side_ctrl',    label:'Side Control',     desc:'Cross-body — no guard to contend with',       player:'top',    group:'top' },
+  { id:'mount',        label:'Mount',            desc:'Hips on chest — highest top pressure',        player:'top',    group:'top' },
+  { id:'back_ctrl',    label:'Back Control',     desc:'Hooks in, seatbelt — most dominant position', player:'top',    group:'top' },
+  { id:'turtle',       label:'Turtle',           desc:'All-fours shell — vulnerable top and bottom', player:'both',   group:'top' },
+  { id:'kob',          label:'Knee on Belly',    desc:'Knee into solar plexus — reactive position',  player:'top',    group:'top' },
+  { id:'north_south',  label:'North-South',      desc:'Head-to-hip — 180° from opponent',            player:'top',    group:'top' },
+];
+
+// ═══════════════════════════════════════════════════════
+// MOVES — 52 circles
+// RULE: non-submission moves must have to:[position_id, ...]
+//        submission moves must have escapes:[escape_move_id, ...]
+//        escape moves connect back TO a position
+// ═══════════════════════════════════════════════════════
+const MOVES = [
+
+  // ━━━ TAKEDOWNS (7) ━━━
+  { id:'double_leg',    label:'Double Leg',       desc:'Level change, shoot, drive through',
+    cat:'Takedown', player:'top',
+    sensei:'The penetration step IS the takedown. Head always to the SIDE — never the middle or it is a free guillotine. Drive all the way through — not just to them.',
+    steps:['Sharp level change — knees bend, hips drop','Penetration step: lead knee drives between feet','Head to outside of their hip — never the middle','Scoop both knees, clasp hands behind them','Drive through with legs, shoulder into hip','Finish to side control'],
+    errs:['Reaching without a level change — instant sprawl','Head in middle — free guillotine every time','Stopping at the knees instead of driving through'],
+    vid:{id:'tgIXxV6Ax1o',src:'Chewjitsu'}, from:['standing','clinch'], to:['side_ctrl'] },
+
+  { id:'single_leg',    label:'Single Leg',        desc:'Run the corner — never try to deadlift',
+    cat:'Takedown', player:'top',
+    sensei:'Run the corner on everyone. Lifting fails on heavy opponents. Walk them in a circle — their base collapses. Head outside, never inside.',
+    steps:['Shoot and wrap one leg — behind knee or calf','Head outside their body on captured leg side','Drive forward pivoting around them','Run the corner: walk in a circle until they fall','Trip option: step behind base foot and drive','Follow to top immediately'],
+    errs:['Head on inside — they sprawl directly on you','Trying to deadlift a heavy opponent','Clasping too high on thigh — no control'],
+    vid:{id:'4HBVdF5AXc0',src:'Andre Galvao'}, from:['standing','clinch'], to:['side_ctrl'] },
+
+  { id:'arm_drag_back', label:'Arm Drag to Back',  desc:'2-on-1 — steal the arm and back together',
+    cat:'Takedown', player:'both',
+    sensei:'The arm drag is position theft. You steal their arm AND the back simultaneously. Move your feet the same moment you drag.',
+    steps:['Establish 2-on-1 (double grip on one arm)','Yank arm sharply across your body','Step to the outside simultaneously','Chest-to-back contact immediately','Insert top hook first then bottom','Attack RNC'],
+    errs:['Slow drag — they pull back, angle is lost','Not stepping outside — you end up in front','Losing chest contact — they spin and face you'],
+    vid:{id:'5F3ZM01oPVo',src:'BJJ Fanatics'}, from:['standing','clinch'], to:['back_ctrl'] },
+
+  { id:'ankle_pick',    label:'Ankle Pick',         desc:'Collar pull shifts weight — pick the ankle',
+    cat:'Takedown', player:'both',
+    sensei:'The ankle pick wins when their weight shifts onto the lead foot. Feel the weight transfer — collar pulls them forward, hand picks the ankle.',
+    steps:['Establish collar and same-side wrist/sleeve grip','Pull collar to load weight onto their lead foot','Dip low and reach for the ankle of the weighted foot','Pull ankle toward you while pushing collar backward','They fall — follow to leg drag or side control'],
+    errs:['Picking when weight is on back foot — nothing happens','No collar control — they simply step back','Not following to a passing position immediately'],
+    vid:{id:'n5PJHMMDtxo',src:'Wrestling/BJJ'}, from:['standing','clinch'], to:['side_ctrl'] },
+
+  { id:'osoto_gari',    label:'O-Soto Gari',        desc:'Off-balance — then reap the leg',
+    cat:'Takedown', player:'both',
+    sensei:'O-soto works on broken posture. Pull their collar to make them lean onto the target leg. Reap with timing not power — the moment their weight loads.',
+    steps:['Establish collar and sleeve grip','Pull collar down to get them leaning onto one leg','Step outside their weighted leg with your same leg','Swing reaping leg behind their calf','Simultaneously pull collar down and push sleeve','Reap the leg — they fall backward'],
+    errs:['Reaping when weight is on the other leg — nothing happens','No collar pull — missing the off-balance','Reaping too high — catch the calf not the thigh'],
+    vid:{id:'n5PJHMMDtxo',src:'Wrestling/BJJ'}, from:['standing','clinch'], to:['side_ctrl','mount'] },
+
+  { id:'guard_pull',    label:'Guard Pull',          desc:'Strategic — establish grips before sitting',
+    cat:'Takedown', player:'bottom',
+    sensei:'Guard pulling is a strategic choice. Grip first — always. Sitting to butterfly is more dangerous than closed guard. Attack immediately — do not stall.',
+    steps:['Establish sleeve and collar grips firmly','Break their posture with collar grip','Sit to mat pulling them into your guard','OR: drop to seated butterfly with hooks in','Control grips — do not lose them on the pull','Attack immediately'],
+    errs:['Pulling without grips — they jump to standing pass','Pulling to closed when butterfly is more dangerous','Stalling instead of attacking'],
+    vid:{id:'UBf7uF5x8GQ',src:'BJJ channel'}, from:['standing','clinch'], to:['closed_guard','butterfly'] },
+
+  { id:'sprawl',        label:'Sprawl Defense',      desc:'React to the level change — hips back and down',
+    cat:'Escape', player:'top',
+    sensei:'React to the level change — not the leg grab. Hips back AND down simultaneously. Chest stays on their back — then circle to front headlock or back take.',
+    steps:['Read level change — react the instant head drops','Shoot hips backward and downward explosively','Legs kick back — hips drop toward mat','Chest stays on their back throughout','Drive hips down — flatten them','Circle to side — front headlock or back take'],
+    errs:['Reacting to leg grab — too late every time','Hips going back but not down — shot completes','Going straight to your knees — end up in their guard'],
+    vid:{id:'n5PJHMMDtxo',src:'Wrestling/BJJ'}, from:['standing','clinch'], to:['turtle'] },
+
+  // ━━━ GUARD PASSES (5) ━━━
+  { id:'toreando',      label:'Toreando Pass',       desc:'Posture up — redirect both knees together',
+    cat:'Pass', player:'top',
+    sensei:'Posture is non-negotiable. Head drops — triangle immediately. Grip BOTH knees at once and redirect. Never one knee at a time.',
+    steps:['Break guard — stand or wedge elbow into thigh','Posture fully — spine straight, head high','Grip both knees simultaneously','Push knees to one side','Step quickly around to that side','Establish side control — chest to chest'],
+    errs:['Breaking posture — triangle danger immediately','Gripping one knee — they reguard with the free leg','Not settling in side control — they recover guard'],
+    vid:{id:'XUrxSihViJI',src:'BJJ Fanatics'}, from:['closed_guard','open_guard','spider_guard'], to:['side_ctrl'] },
+
+  { id:'knee_slice',    label:'Knee Slice Pass',     desc:'Diagonal shin to the mat — crossface seals it',
+    cat:'Pass', player:'top',
+    sensei:'Shin must go ALL the way to the mat — halfway means they recover guard. Crossface immediately to kill the underhook. Weight through the shin.',
+    steps:['Post lead knee inside their guard on the mat','Grab their far hip with lead hand','Drive shin diagonally across their thigh','Maintain heavy downward pressure with shin','Step trailing leg through to side control','Crossface immediately — prevent the underhook'],
+    errs:['Shin not reaching mat — they recover guard','No crossface — they get underhook and take your back','Hips too high — no pressure, they hip escape'],
+    vid:{id:'XUrxSihViJI',src:'BJJ Fanatics'}, from:['half_guard','open_guard','closed_guard'], to:['side_ctrl'] },
+
+  { id:'over_under',    label:'Over-Under Pass',     desc:'Stack and tilt — one arm over, one under',
+    cat:'Pass', player:'top',
+    sensei:'The over-under is a grind position. One arm under their leg, one arm over. Post the hip, tilt them, clear the under-leg. The tilt breaks their defense.',
+    steps:['One arm under their leg (underhook leg), one arm over other leg','Grip far hip under the bottom leg','Drive shoulder into thigh — stack them','Tilt toward the overhook side','Clear underhook leg by driving knee to mat','Settle into side control'],
+    errs:['Loose hip grip — they shrimp and reguard','Not stacking enough — they have room to move','Passing to wrong side — pass toward the overhook leg'],
+    vid:{id:'XUrxSihViJI',src:'BJJ Fanatics'}, from:['open_guard','closed_guard'], to:['side_ctrl'] },
+
+  { id:'leg_drag',      label:'Leg Drag Pass',       desc:'Drag leg across hips — perpendicular walk-around',
+    cat:'Pass', player:'top',
+    sensei:'Leg drag is position not strength. Drag across your lap, turn perpendicular, walk around. Their hip is locked — they cannot reguard.',
+    steps:['Control their leg — grip behind the knee','Drag the leg across your lap, pin with your hip','Turn to face them perpendicularly','Walk feet toward their head','Chest settles over their hip','Crossface to lock in side control'],
+    errs:['Letting leg go before settling — they reguard','Facing them directly — they can still use hips','Moving too fast — they scramble before you land'],
+    vid:{id:'XUrxSihViJI',src:'BJJ Fanatics'}, from:['open_guard','dlr'], to:['side_ctrl'] },
+
+  { id:'smash_pass',    label:'Smash Pass',          desc:'Chest on legs — stack and walk to side control',
+    cat:'Pass', player:'top',
+    sensei:'The smash pass belongs to pressure players. Chest on their legs, walk around. Weight transfers from chest to hip. Make them carry your weight.',
+    steps:['Control both legs — grip cuffs or behind knees','Stack legs onto chest — fold them','Post toes on mat, drive chest weight down','Walk feet toward their head on one side','Transfer weight from chest to their hip','Stand and establish side control'],
+    errs:['Hips too high — no chest pressure, they escape','Walking toward legs not their head','Releasing leg control before establishing side control'],
+    vid:{id:'XUrxSihViJI',src:'BJJ Fanatics'}, from:['closed_guard','open_guard'], to:['side_ctrl'] },
+
+  // ━━━ SUBMISSIONS FROM TOP (9) — each has escapes:[] ━━━
+  { id:'rnc',           label:'Rear Naked Choke',    desc:'Blood choke from back — hooks first, always',
+    cat:'Submission', player:'top',
+    sensei:'Hooks first — every single time. Depth is everything: mid-bicep, not forearm. Blood choke or nothing — shallow arm means airway only which takes forever.',
+    steps:['Both hooks in — feet inside hips, DO NOT cross ankles','Slide choking arm under chin — mid-bicep depth','Elbow aligned with their chin — depth is the whole technique','Other hand behind their head — palm on skull','Flex both arms like a bicep curl simultaneously','Squeeze — they go in seconds'],
+    errs:['Crossing ankles — they foot-lock you','Arm too shallow — airway only, very slow','Going for choke before hooks are in — you lose the back'],
+    vid:{id:'l8-JI7NND3E',src:'John Danaher'}, from:['back_ctrl'], to:[],
+    escapes:['back_escape'] },
+
+  { id:'bow_arrow',     label:'Bow & Arrow',         desc:'Deep collar grip + leg over shoulder — gi choke',
+    cat:'Submission', player:'top',
+    sensei:'The bow and arrow is the most powerful gi choke. Four fingers deep in the collar. Leg over shoulder multiplies the torque impossibly — they cannot defend it.',
+    steps:['From back control — deep cross collar grip, 4 fingers in','Transition to side of choking arm','Swing top leg over their far shoulder','Grip their far knee or pant leg with bottom hand','Extend your body like a bow — pull collar, push knee','The choke tightens — tap comes immediately'],
+    errs:['Shallow collar grip — they can still defend','Leg not over the shoulder — they turn into you','Not extending fully — needs full body tension'],
+    vid:{id:'l8-JI7NND3E',src:'John Danaher'}, from:['back_ctrl','turtle'], to:[],
+    escapes:['back_escape'] },
+
+  { id:'americana',     label:'Americana',           desc:'Elbow stays on mat — paint the hand to hip',
+    cat:'Submission', player:'top',
+    sensei:'Elbow stays on the mat — everything depends on this single detail. Elbow lifts and the lock vanishes. They straighten the arm — switch to armbar instantly.',
+    steps:['Mount or side control — establish high base','Pin wrist to mat — your palm on their wrist','Thread free arm under their elbow — figure-4','Grip own wrist — lock confirmed','Elbow stays on mat throughout — mandatory','Paint their hand slowly toward hip — wait for tap'],
+    errs:['Lifting their elbow — all mechanical advantage gone','Cranking fast — they escape and partner gets hurt','Too low in mount — they bridge and buck you off'],
+    vid:{id:'QBqwipFt0Ww',src:'Gracie University'}, from:['mount','side_ctrl','kob'], to:[],
+    escapes:['upa','elbow_esc','shrimp_esc'] },
+
+  { id:'armbar_top',    label:'Armbar (Top)',         desc:'Wait for the post — slow pivot, thumb up',
+    cat:'Submission', player:'top',
+    sensei:'Timing not strength. Wait for them to post a hand or push up. White belts rush and fall into guard. Move SLOW — controlled is the only finish.',
+    steps:['From mount — wait for them to post hand or raise arm','Pin that wrist to your chest with both hands','Slide knee up toward head on trapped arm side','Swing opposite leg over head — pivot 90°','Sit back slow — arm between knees, thumb UP','Lift hips smoothly — they tap immediately'],
+    errs:['Moving too fast — you fall into their guard','Thumb pointing down — wrong pressure direction','Legs apart — they pull arm free before extension'],
+    vid:{id:'QI9nIKNm9HM',src:'Gracie University'}, from:['mount','side_ctrl','kob'], to:[],
+    escapes:['upa','elbow_esc','shrimp_esc'] },
+
+  { id:'arm_tri',       label:'Arm Triangle',        desc:'Their shoulder cuts one carotid — same side head',
+    cat:'Submission', player:'top',
+    sensei:'Their own shoulder cuts one carotid. Your arm cuts the other. Head MUST be on the SAME side as the trapped arm. Wrong side — anatomically impossible.',
+    steps:['Side control — trap near arm against side of neck','Slide arm under neck — arm and neck both inside','Head to mat on SAME side as trapped arm','Walk feet away to flatten them completely','Drive hips toward trapped arm side','Squeeze and flex — both carotids compressed'],
+    errs:['Head on wrong side — choke is impossible','Arm not tight against neck — they slip free','Stopping when they turtle — follow them'],
+    vid:{id:'TqxuTFFbn1E',src:'Gracie Breakdown'}, from:['side_ctrl','mount','north_south'], to:[],
+    escapes:['shrimp_esc','elbow_esc'] },
+
+  { id:'kimura_top',    label:'Kimura (Top)',         desc:'Figure-4 shoulder lock — purely mechanical',
+    cat:'Submission', player:'top',
+    sensei:'Control the wrist FIRST — everything else follows. Once the figure-4 is clean it is purely mechanical. They cannot escape with raw strength.',
+    steps:['Wrist comes off mat — attack immediately','Grab wrist with both hands firmly','Thread far arm behind elbow — figure-4','Clasp own wrist — lock confirmed','Lift elbow while rotating hand toward back','Steady pressure toward shoulder blade — wait for tap'],
+    errs:['Losing wrist on figure-4 transition','Letting them grab their gi belt — isolate wrist first','Rushing — slow steady pressure finishes, cranking escapes'],
+    vid:{id:'1WMNARrX4wI',src:'BJJ Fanatics'}, from:['side_ctrl','mount','kob','north_south','turtle'], to:[],
+    escapes:['shrimp_esc','upa','turtle_escape'] },
+
+  { id:'darce',         label:"D'arce Choke",         desc:'Thread arm through armpit and neck — no-gi',
+    cat:'Submission', player:'top',
+    sensei:"The D'arce threads your arm THROUGH — under armpit, around neck. Thread deep, clasp, walk to the far side. The walk is what creates the finishing pressure.",
+    steps:['Turtle or north-south — thread arm under near armpit','Arm goes under armpit AND around neck','Clasp hands — triangle of forearms around neck and arm','Walk to the far side to increase pressure','Squeeze the triangle of forearms together','Carotids compressed — tap comes fast'],
+    errs:['Not threading deep enough — under armpit only, not neck','Squeezing before walking far side — wrong angle','Fingers crossed instead of palm-to-palm'],
+    vid:{id:'TqxuTFFbn1E',src:'Gracie Breakdown'}, from:['turtle','north_south','side_ctrl'], to:[],
+    escapes:['turtle_escape','shrimp_esc'] },
+
+  { id:'ezekiel',       label:'Ezekiel Choke',        desc:'Sleeve choke from mount — surprise weapon',
+    cat:'Submission', player:'top',
+    sensei:'The Ezekiel from mount surprises people focused on bridge-and-roll. Sleeve grip deep — reach across their throat. Most people have never felt it coming.',
+    steps:['From mount — sleeve grip on one arm (fingers inside sleeve)','Slide that hand under their neck','Grab own sleeve with free hand','Pull arms apart in opposite directions','Sleeve edge cuts across their carotid','Hold the position — they tap'],
+    errs:['Shallow sleeve grip — no edge for the choke','Lifting their head — they can defend easier','Not getting full range of motion on the pull apart'],
+    vid:{id:'l8-JI7NND3E',src:'John Danaher'}, from:['mount','side_ctrl'], to:[],
+    escapes:['upa','elbow_esc'] },
+
+  { id:'north_south_choke', label:'NS Choke',         desc:'Hip drop compresses both carotids',
+    cat:'Submission', player:'top',
+    sensei:'The north-south choke is pure hip mechanics. Drop your hip to their far side. Chest seals their face. Almost impossible to defend correctly.',
+    steps:['North-south — slide near arm under their near armpit','Wrap arm around head — forearm on far side of neck','Drop hip to their far side — weight on their chest','Pull their head into your chest','Squeeze elbow toward hip','Both carotids compressed — lights out fast'],
+    errs:['Not dropping hip to far side — no pressure','Space between chest and their face','Arm too high on neck — no carotid pressure'],
+    vid:{id:'TqxuTFFbn1E',src:'Gracie Breakdown'}, from:['north_south'], to:[],
+    escapes:['shrimp_esc'] },
+
+  // ━━━ SUBMISSIONS FROM BOTTOM (9) — each has escapes:[] ━━━
+  { id:'triangle',      label:'Triangle Choke',      desc:'Cut the angle first — squeeze second',
+    cat:'Submission', player:'bottom',
+    sensei:'Cut the angle before you squeeze. Squeezing straight — strong opponent stacks you immediately. 30-45° to the trapped arm FIRST. Pull the head DOWN.',
+    steps:['Break posture — sleeve and collar grips','Open guard, foot on hip on controlled-arm side','Shoot hips to create angle — most crucial step','Swing leg over shoulder on controlled arm side','Lock ankle behind own knee','Cut 30-45°, pull head DOWN, squeeze knees, push hips up'],
+    errs:['Not cutting angle — they stack you immediately','Leg too low — back of neck not throat','Not pulling head down — posture breaks the choke'],
+    vid:{id:'Er9fHtsYw9U',src:'Stephan Kesting'}, from:['closed_guard','open_guard','butterfly','spider_guard'], to:[],
+    escapes:['toreando','posture_def'] },
+
+  { id:'armbar_guard',  label:'Armbar (Guard)',      desc:'Hips UP on the pivot — rotate as one unit',
+    cat:'Submission', player:'bottom',
+    sensei:'Triangle and armbar are one system. They clasp to defend triangle — kick through for armbar. They defend armbar — back to triangle. Hips UP on the pivot.',
+    steps:['Control one wrist — pull to chest','Same-side foot flat on their hip','Swing opposite leg in big arc across face','LIFT hips off mat and rotate 90° as leg swings','Pinch knees tightly — thumb pointing UP','Bridge hips smoothly — tap comes fast'],
+    errs:['Not lifting hips on pivot — leg stalls on shoulder','Thumb down — wrong pressure direction','Knees apart — they pull arm free'],
+    vid:{id:'Er9fHtsYw9U',src:'Stephan Kesting'}, from:['closed_guard','open_guard'], to:[],
+    escapes:['toreando','posture_def'] },
+
+  { id:'omoplata',      label:'Omoplata',            desc:'Shoulder lock with legs — sit up to finish',
+    cat:'Submission', player:'bottom',
+    sensei:'Omoplata is the third weapon in the triangle-armbar system. Sit UP to finish — lying flat has zero pressure. Hold their far hip to stop the forward roll escape.',
+    steps:['Failed triangle or armbar — arm is outside triangle','Swing leg over their shoulder (not across neck)','Sit up and post hand on mat behind you','Walk hips away to create shoulder bend','Leg weight bends arm behind their back','Sit forward — downward pressure finishes'],
+    errs:['Not sitting up — zero pressure lying flat','They roll forward to escape — hold far hip','Leg too low on arm — no shoulder rotation'],
+    vid:{id:'Er9fHtsYw9U',src:'Stephan Kesting'}, from:['closed_guard','open_guard','dlr'], to:[],
+    escapes:['toreando','posture_def'] },
+
+  { id:'guillotine',    label:'Guillotine',          desc:'Under the chin — blood choke — pull guard',
+    cat:'Submission', player:'both',
+    sensei:'Arm UNDER the chin — not across throat. Airway choke takes forever. Blood choke ends it. Always pull guard. Choking wrist on top, head in armpit tight.',
+    steps:['Opponent shoots — sprawl hips back immediately','Wrap arm deep under neck — under chin not throat','Clasp hands palm-to-palm, choking wrist on top','Head tight in armpit — zero space','Jump to closed guard and lock feet','Arch back, squeeze knees, lift hips to finish'],
+    errs:['Arm across throat — airway only, very slow','Finishing while standing — always pull guard','Space between head and armpit — they posture out'],
+    vid:{id:'TqxuTFFbn1E',src:'Gracie Breakdown'}, from:['standing','clinch','closed_guard','turtle'], to:[],
+    escapes:['posture_def','double_leg'] },
+
+  { id:'kimura_guard',  label:'Kimura (Guard)',      desc:'Sit up to attack — one grip, four outcomes',
+    cat:'Submission', player:'bottom',
+    sensei:'Sitting up doubles your leverage — flat on back means nothing. One grip: submission, sweep, back take, or armbar. When too strong to finish — sweep.',
+    steps:['Closed guard — they post hand on hip, attack immediately','SIT UP using core — toward their arm','Grip wrist same-side — hold firm','Reach over shoulder, behind elbow — figure-4','Clasp own wrist — lock on','Break sideways, lift elbow, rotate toward back for tap'],
+    errs:['Attacking flat on back — always fails','Losing wrist on figure-4 transition','Fighting their strength — sweep or go to back instead'],
+    vid:{id:'1WMNARrX4wI',src:'BJJ Fanatics'}, from:['closed_guard','half_guard','butterfly'], to:[],
+    escapes:['toreando','knee_slice'] },
+
+  { id:'heel_hook_in',  label:'Inside Heel Hook',   desc:'Shin-to-shin — rotate the whole body',
+    cat:'Submission', player:'both',
+    sensei:'Bicep on Achilles, forearm on calf. Rotate your WHOLE body — not just your arms. Full body rotation generates the torque. Apply with control in training.',
+    steps:['Establish shin-to-shin or single leg X','Scoop heel — bicep on Achilles, forearm across calf','Grip heel firmly with both hands','Fall to back on inside of their knee','Rotate whole body away — like turning a steering wheel','Rotation torques the knee — apply with control'],
+    errs:['Rotating just the arms — needs full body rotation','Not controlling knee alignment — dangerous for partner','Applying fast — injuries happen before they feel it'],
+    vid:{id:'Er9fHtsYw9U',src:'Stephan Kesting'}, from:['leg_ent','x_guard','fifty_fifty'], to:[],
+    escapes:['heel_escape'] },
+
+  { id:'heel_hook_out', label:'Outside Heel Hook',  desc:'Outside ashi — extremely high danger',
+    cat:'Submission', player:'both',
+    sensei:'The outside heel hook attacks ACL and MCL simultaneously. In training: apply VERY slowly and release immediately on any tap. Respect this submission completely.',
+    steps:['Establish outside ashi garami position','Outside leg traps their knee from outside','Inside leg hooks under their hip','Grip heel — same mechanics as inside from outside','Rotate away — torque goes in opposite direction','Apply VERY slowly — injury precedes the tap'],
+    errs:['Applying at full speed in training — catastrophic injury','Not controlling the knee — ACL and MCL both at risk','Wrong ashi position — must have outside control'],
+    vid:{id:'Er9fHtsYw9U',src:'Stephan Kesting'}, from:['leg_ent','fifty_fifty'], to:[],
+    escapes:['heel_escape'] },
+
+  { id:'kneebar',       label:'Kneebar',             desc:'Hyperextend the knee — hips drive into joint',
+    cat:'Submission', player:'both',
+    sensei:'The kneebar is a knee hyperextension attack. Trap the leg against your chest, drive hips into the back of the knee. Legal in no-gi at brown belt and above — know your ruleset.',
+    steps:['Control their leg — hug it to your chest','Their knee rests against your hip and chest','Drive hips forward into back of their knee','The knee hyperextends — apply slow pressure','Their heel is under your armpit for control','Squeeze the leg tight — they tap'],
+    errs:['Loose leg grip — they pull free','Hips too far back — no pressure on joint','Applying fast — knee injuries are instant'],
+    vid:{id:'Er9fHtsYw9U',src:'Stephan Kesting'}, from:['fifty_fifty','leg_ent','half_guard'], to:[],
+    escapes:['heel_escape'] },
+
+  { id:'straight_ankle',label:'Ankle Lock',          desc:'Achilles lock — legal at all levels',
+    cat:'Submission', player:'both',
+    sensei:'Entry-level leg lock, legal everywhere. Heel under your armpit — rotate your body not just your arms. Clean entry from shin-to-shin.',
+    steps:['Control their leg — grip behind the Achilles','Heel goes under your armpit — hug shin to chest','Fall to back — engage leg lock position','Arch back and drive hips forward','Rotate body — Achilles compressed against your arm','Apply steady pressure — they tap'],
+    errs:['Heel not under armpit — arm too high, no lever','Pulling with arms only — use full body arch','Bent knee — heel hook is the right tool for bent knee'],
+    vid:{id:'Er9fHtsYw9U',src:'Stephan Kesting'}, from:['leg_ent','open_guard','fifty_fifty'], to:[],
+    escapes:['heel_escape'] },
+
+  // ━━━ SWEEPS (8) ━━━
+  { id:'scissor',       label:'Scissor Sweep',       desc:'Collar + sleeve — simultaneous scissors',
+    cat:'Sweep', player:'bottom',
+    sensei:'Collar and sleeve grip is non-negotiable. Without collar breaking posture they base out every time. Simultaneous scissors AND collar pull — timing beats strength.',
+    steps:['Cross-collar and sleeve grips established','Open guard — one knee on chest (sleeve side)','Hook other leg behind their knee (opposite side)','Break posture forward with collar — get them leaning','Simultaneously: push chest knee, sweep back leg, pull sleeve','Keep pulling sleeve — land directly in mount'],
+    errs:['No collar grip — they base out always','Sequential not simultaneous motion','Releasing sleeve during sweep — end in their guard'],
+    vid:{id:'UBf7uF5x8GQ',src:'BJJ channel'}, from:['closed_guard'], to:['mount'] },
+
+  { id:'hip_bump',      label:'Hip Bump Sweep',      desc:'Meet their posture — post and bump together',
+    cat:'Sweep', player:'bottom',
+    sensei:'Meet their posture — do not chase it. Post one hand behind you, swing other arm behind their back, bump your hip the SAME moment they rise. Timing beats strength.',
+    steps:['Closed guard — wait for them to sit up tall','AS they posture — sit up simultaneously, post hand behind you','Swing free arm around behind their back','Bump hip upward and into them — posted hand is the lever','Push them over your hip','Follow and land in mount'],
+    errs:['Sitting up too slowly — posture already established','Not committing — half-hearted bump does nothing','Forgetting posted hand — no lever to sit up from'],
+    vid:{id:'nCWt7No79jo',src:'BJJ channel'}, from:['closed_guard'], to:['mount'] },
+
+  { id:'flower',        label:'Flower Sweep',        desc:'Pendulum leg generates force — not your arms',
+    cat:'Sweep', player:'bottom',
+    sensei:'The power is the pendulum. White belts muscle this. The leg swing generates force — not your arms. Build the arc, convert momentum to rotation.',
+    steps:['From guard — grab same-side sleeve','Reach down and grab behind ankle or knee','Open guard and post foot for hip mobility','Swing bottom leg in big pendulum arc — build momentum','Use momentum to roll them over toward posted hand','Follow to mount — keep sleeve grip'],
+    errs:['Not building pendulum momentum — stalls immediately','Forgetting ankle grip — they base with foot','Releasing sleeve during sweep'],
+    vid:{id:'nCWt7No79jo',src:'BJJ channel'}, from:['closed_guard','half_guard'], to:['mount'] },
+
+  { id:'butterfly_sweep',label:'Butterfly Sweep',   desc:'Underhook drives — hook lifts — fall to side',
+    cat:'Sweep', player:'bottom',
+    sensei:'Butterfly sweep is off-balancing not lifting. Underhook drives them forward, hook lifts from below. Get LOWER than them — their weight becomes the problem.',
+    steps:['Butterfly guard — seatbelt: underhook one side, overhook other','Level change — get lower than them','Fall to the underhook side','Simultaneously: lift hook on that side, drive with underhook','Their base collapses toward the hook side','Follow to mount or take the back'],
+    errs:['No underhook — they base with their hands','Not falling to the side — sweeping straight up fails','Too upright — must be lower than their center of gravity'],
+    vid:{id:'nCWt7No79jo',src:'BJJ channel'}, from:['butterfly'], to:['mount','side_ctrl'] },
+
+  { id:'dlr_sweep',     label:'DLR Sweep',           desc:'Hook destabilises — far ankle pull topples them',
+    cat:'Sweep', player:'bottom',
+    sensei:'DLR hook takes their base. Grab the far ankle simultaneously. Pull as you kick the hook out — they topple forward face down. Follow to top.',
+    steps:['Establish DLR: hook outside their lead leg with inside leg','Control sleeve, grab far ankle with other hand','Kick DLR hook out and up to break base','Pull far ankle toward you simultaneously','Rotate toward DLR hook side','Follow to top — they are face down'],
+    errs:['Not gripping far ankle — no direction for sweep','DLR hook too shallow — they step through','Not rotating toward hook side'],
+    vid:{id:'nCWt7No79jo',src:'BJJ channel'}, from:['dlr'], to:['side_ctrl','back_ctrl'] },
+
+  { id:'spider_sweep',  label:'Spider Guard Sweep',  desc:'Sleeve + bicep push — elevate and tilt',
+    cat:'Sweep', player:'bottom',
+    sensei:'Spider guard sweep: sleeve grip controls direction, bicep push breaks their base. Push and pull in opposite directions simultaneously — they have no answer.',
+    steps:['Spider guard — both feet on biceps, both sleeve grips','Create frame — push one foot into bicep strongly','Pull opposite sleeve simultaneously','The push-pull off-balances them toward the push side','Extend pushing leg fully — they topple','Follow to top position'],
+    errs:['Only pushing — not also pulling the opposite sleeve','Feet too low — on forearms not biceps','Not following through to a top position'],
+    vid:{id:'nCWt7No79jo',src:'BJJ channel'}, from:['spider_guard'], to:['mount','side_ctrl'] },
+
+  { id:'deep_half_sweep',label:'Deep Half Sweep',   desc:'Homer Simpson — bridge away and come up behind',
+    cat:'Sweep', player:'bottom',
+    sensei:'Deep half is one of the safest guards. The Homer Simpson: underhook their lead leg, bridge away from them, come up behind. You end up behind them — back take.',
+    steps:['From deep half — far underhook under lead leg','Head on outside of their lead leg','Create platform — your hip is their footstool','Bridge AWAY from them (the Homer Simpson)','Their lead leg swept backward','Come up behind them — take the back'],
+    errs:['Head on inside — they cradle and pass','Not bridging away — must move in their direction','Coming up on the wrong side — take back not front'],
+    vid:{id:'nCWt7No79jo',src:'BJJ channel'}, from:['deep_half'], to:['back_ctrl'] },
+
+  { id:'x_guard_sweep', label:'X-Guard Sweep',       desc:'Two hooks lift — tilt any direction they fall',
+    cat:'Sweep', player:'bottom',
+    sensei:'X-guard is the most destabilising guard. Two hooks — zero base. Any direction you tilt, they fall. Get under them from butterfly or sit-up guard.',
+    steps:['Establish X-guard: both hooks under thighs','One hook inside knee, one under calf same side','Lift with both hooks simultaneously','Tilt toward their straightened leg side','OR: extend legs to sweep them forward','Stand up following the sweep'],
+    errs:['Hooks not deep enough — they step out','Not tilting before sweeping — they regain base','Not standing up after — back to guard'],
+    vid:{id:'nCWt7No79jo',src:'BJJ channel'}, from:['x_guard'], to:['side_ctrl','mount'] },
+
+  // ━━━ ESCAPES (8) ━━━
+  { id:'upa',           label:'Upa (Bridge & Roll)', desc:'Trap arm — explosive bridge straight up',
+    cat:'Escape', player:'bottom',
+    sensei:'Elbows IN always. Flaring elbows in mount means you get choked in seconds. Trap arm AND wrist. Bridge STRAIGHT UP — not sideways. Explosive or it fails.',
+    steps:['Mount bottom — pull elbows tight to sides immediately','Trap one arm: grip wrist, hug elbow to chest','Plant same-side foot flat on mat — close to butt','Bridge explosively — hips HIGH and STRAIGHT up','Turn into trapped arm — it is your axis','Land in their guard — scramble to knees'],
+    errs:['Elbows flaring — instant choke setup','Bridging sideways — all power lost','Foot too far from body — no leverage'],
+    vid:{id:'QBqwipFt0Ww',src:'Gracie University'}, from:['mount'], to:['closed_guard'] },
+
+  { id:'elbow_esc',     label:'Elbow Escape',        desc:'Frame on hip — shrimp out, insert knee shield',
+    cat:'Escape', player:'bottom',
+    sensei:'The elbow escape separates survivors from people who get submitted every round. Frame FIRST — no frame means no space. Insert knee shield the instant space appears.',
+    steps:['Mount bottom — frame: forearm on hip, hand on bicep','Shrimp hips strongly to one side — create space','Bring bottom knee up and insert as knee shield','Push their knee with your foot for more space','Insert top knee — form half or full guard','Continue framing and shrimping until guard recovered'],
+    errs:['Not framing before shrimping — no space created','Shrimping without inserting knee — they close right back','Moving too slowly — mount is pressure, move with urgency'],
+    vid:{id:'QBqwipFt0Ww',src:'Gracie University'}, from:['mount'], to:['half_guard','closed_guard'] },
+
+  { id:'shrimp_esc',    label:'Shrimp Escape',       desc:'Frame buys time — shrimp and insert knee shield',
+    cat:'Escape', player:'bottom',
+    sensei:'Shrimping is the most important movement in BJJ. If you can shrimp you can survive anything. Frame buys time. Three hip escapes recovers full guard.',
+    steps:['Side control bottom — frame: forearm on throat, elbow on hip','Turn to side facing them — do NOT get flattened','Push frame to create space — even 2-3 inches enough','Shrimp: drive hips powerfully away, curl to fetal position','Bring knee up — insert as knee shield','Continue in stages to recover half or full guard'],
+    errs:['Muscling against a heavier person — always fails','Getting flattened — frames lost, cannot work','Not inserting knee shield — they collapse back'],
+    vid:{id:'QBqwipFt0Ww',src:'Gracie University'}, from:['side_ctrl','kob','north_south'], to:['half_guard','closed_guard'] },
+
+  { id:'back_escape',   label:'Back Escape',         desc:'Turn INTO them — chin tucked, face them',
+    cat:'Escape', player:'bottom',
+    sensei:'Never turn away — that keeps hooks and lets them re-choke. Turn INTO them toward the choking arm. Chin tucked, protect choke lane first, then turn.',
+    steps:['Back control bottom — chin tucked, protect choke lane','Grab choking arm with both hands — peel off chin','Turn INTO them — toward choking arm side','Elbow-knee: drive elbow to knee to break hook','Continue turning until you face them','End in their guard — work to pass immediately'],
+    errs:['Turning away — they keep hooks and re-choke','Not protecting chin first — choke lands in seconds','Breaking grip without turning — they reinstate it'],
+    vid:{id:'QBqwipFt0Ww',src:'Gracie University'}, from:['back_ctrl'], to:['closed_guard'] },
+
+  { id:'turtle_escape', label:'Turtle Escape',       desc:'Granby roll — invert and recover guard',
+    cat:'Escape', player:'bottom',
+    sensei:'The granby roll from turtle: when they try to insert a hook — roll through. Tuck your shoulder to the mat and invert. You land on your back in guard.',
+    steps:['In turtle — feel them trying to insert a hook','Tuck near shoulder to mat','Roll over your shoulder — inverting your hips','Legs come over toward their far side','Land on back with them in your guard','Establish grips immediately'],
+    errs:['Rolling at wrong time — not on hook insertion','Not tucking shoulder — you roll flat not inverted','Slow roll — they follow and maintain back control'],
+    vid:{id:'QBqwipFt0Ww',src:'Gracie University'}, from:['turtle'], to:['closed_guard','open_guard'] },
+
+  { id:'heel_escape',   label:'Heel Hook Escape',    desc:'Bite the leg — hip escape away from the rotation',
+    cat:'Escape', player:'bottom',
+    sensei:'The heel hook escape: do not straighten your leg — that is submission. Bite down on their leg by bending your knee toward your hip, and hip escape away from the rotation direction.',
+    steps:['Feel heel hook grip being established','Do NOT straighten your leg — that tightens the submission','Bend your knee toward your hip — reduce rotation range','Hip escape away from the direction they are rotating','Use free leg to frame against their hip','Recover to shin-to-shin or standing'],
+    errs:['Straightening the leg — tears the knee immediately','Rotating in the direction they want — helps them finish','Panicking and tapping too early — technique first'],
+    vid:{id:'Er9fHtsYw9U',src:'Stephan Kesting'}, from:['leg_ent','fifty_fifty'], to:['open_guard','standing'] },
+
+  { id:'posture_def',   label:'Posture Defense',     desc:'Posture up — frame and break guillotine grips',
+    cat:'Escape', player:'top',
+    sensei:'Against the guillotine from inside guard: posture up and bring your elbow to your hip first. Then step the same-side leg up. Their grip breaks when your posture is restored.',
+    steps:['Feel guillotine grip around your neck','Bring elbow of trapped arm side tight to your hip','Step same-side foot up — create posture base','Drive your head into their chest — not up, INTO them','Use free hand to push their elbow down','Posture restored — threat neutralised, pass the guard'],
+    errs:['Pulling your head straight up — tightens the choke','Not bringing elbow to hip first — no base for posture','Staying in guard — pass immediately once guillotine is broken'],
+    vid:{id:'QBqwipFt0Ww',src:'Gracie University'}, from:['closed_guard'], to:['side_ctrl'] },
+
+  // ━━━ CONTROL / TRANSITIONS (5) ━━━
+  { id:'back_take',     label:'Back Take',           desc:'Chest-to-back — top hook first, always',
+    cat:'Control', player:'top',
+    sensei:'Back is the highest value position. Chest-to-back at all times. Top hook first then bottom — never both at once. Follow every single time they turn away.',
+    steps:['When they turn away — follow immediately','Chest to their back — maintain tight contact','Post far hand on mat, swing leg over for top hook first','Thread bottom hook in — one at a time','Seatbelt: one arm over shoulder, one under armpit','Clasp hands at chest — attack RNC or bow and arrow'],
+    errs:['Both hooks at once — they escape the scramble','Losing chest contact — they turn and face you','Not following when they turn — window closes instantly'],
+    vid:{id:'5F3ZM01oPVo',src:'BJJ Fanatics'}, from:['side_ctrl','turtle','half_guard','mount','north_south'], to:['back_ctrl'] },
+
+  { id:'underhook_hg',  label:'Underhook Battle',    desc:'Win the underhook — win the half guard',
+    cat:'Control', player:'bottom',
+    sensei:'Half guard is the underhook battle. Only thought: get the underhook. Turn to your side. Fight aggressively. Once you have it — take the back.',
+    steps:['Half guard bottom — turn to side, face opponent','Fight aggressively for underhook — deep under armpit','Frame other arm on bicep — block the crossface','Head goes to underhook side once secured','Option A: hip escape trapped leg free, recover guard','Option B: walk feet toward back — take the back'],
+    errs:['Staying flat on back — underhook is unachievable','Letting them get crossface — they flatten and win','Not committing to a path — stuck in half guard indefinitely'],
+    vid:{id:'5F3ZM01oPVo',src:'BJJ Fanatics'}, from:['half_guard'], to:['closed_guard','back_ctrl'] },
+
+  { id:'kimura_bottom', label:'Kimura (Bottom SC)',  desc:'Surprise counter from bottom — submission or sweep',
+    cat:'Submission', player:'bottom',
+    sensei:'They think they are winning from top. Near arm posts — attack it. Kimura from bottom side control surprises everyone. Too strong to finish — use it as a sweep.',
+    steps:['Bottom side control — near arm posts on mat, attack','Grip wrist with both hands firmly','Thread far arm behind elbow — figure-4 grip','Clasp own wrist to complete lock','Use grip to pull yourself to your side','Finish submission OR sweep them back to guard'],
+    errs:['Missing entry window — they post and lift arm fast','Losing wrist grip on figure-4 transition','Only using it as submission — it is also a sweep'],
+    vid:{id:'1WMNARrX4wI',src:'BJJ Fanatics'}, from:['side_ctrl'], to:['closed_guard','half_guard'],
+    escapes:['shrimp_esc'] },
+
+  { id:'berimbolo',     label:'Berimbolo',           desc:'Invert under them — back take from DLR',
+    cat:'Control', player:'bottom',
+    sensei:'The berimbolo: invert under them from DLR, come out on the other side behind them. It is a back take using your body as a rotating lever. Core strength and timing are everything.',
+    steps:['Establish DLR with sleeve control','Break their posture — pull them forward','Begin to invert: bring knees to chest, roll to shoulder','Thread legs through — come out behind them','Establish back control: chest-to-back','Insert hooks — attack with RNC or bow and arrow'],
+    errs:['Not getting their posture broken first','Inverting too slowly — they post and recover','Coming out in front of them instead of behind'],
+    vid:{id:'5F3ZM01oPVo',src:'BJJ Fanatics'}, from:['dlr','open_guard'], to:['back_ctrl'] },
+
+  { id:'leg_pummeling', label:'Leg Pummel / 50-50',  desc:'Control the leg exchange — enter leg entanglement',
+    cat:'Control', player:'both',
+    sensei:'The leg pummel is how you enter and control leg entanglements. Constant reeling motion — like arm pummeling but with your legs. The inside position determines who attacks.',
+    steps:['From seated or after failed takedown — leg contact established','Pummel your inside leg to the inside position (like arm pummeling)','Establish shin-to-shin or 50/50 control','Work toward inside heel hook position (inside leg on inside)','Constantly re-pummel — do not let them get inside','Attack heel hook or ankle lock from dominant leg position'],
+    errs:['Giving up inside position — they attack your heel hook','Stopping leg pummeling — they reset the position','Reaching for heel hook without inside position — they counter immediately'],
+    vid:{id:'Er9fHtsYw9U',src:'Stephan Kesting'}, from:['fifty_fifty','leg_ent'], to:['leg_ent','fifty_fifty'] },
+];
+
+// ═══════════════════════════════════════════════════════
+// EDGES — position-to-position + move edges
+// RULE: every non-submission move has to:[] linking to a position
+//       every submission has escapes:[] linking to escape moves
+// ═══════════════════════════════════════════════════════
+const EDGES = [
+  // Position flow
+  { from:'standing',    to:'clinch',       type:'pos' },
+  { from:'standing',    to:'closed_guard', type:'pos' },
+  { from:'clinch',      to:'closed_guard', type:'pos' },
+  { from:'clinch',      to:'back_ctrl',    type:'pos' },
+  { from:'clinch',      to:'side_ctrl',    type:'pos' },
+  { from:'closed_guard',to:'half_guard',   type:'pos' },
+  { from:'closed_guard',to:'open_guard',   type:'pos' },
+  { from:'closed_guard',to:'butterfly',    type:'pos' },
+  { from:'half_guard',  to:'deep_half',    type:'pos' },
+  { from:'half_guard',  to:'open_guard',   type:'pos' },
+  { from:'open_guard',  to:'spider_guard', type:'pos' },
+  { from:'open_guard',  to:'dlr',          type:'pos' },
+  { from:'open_guard',  to:'x_guard',      type:'pos' },
+  { from:'dlr',         to:'x_guard',      type:'pos' },
+  { from:'x_guard',     to:'leg_ent',      type:'pos' },
+  { from:'dlr',         to:'leg_ent',      type:'pos' },
+  { from:'leg_ent',     to:'fifty_fifty',  type:'pos' },
+  { from:'fifty_fifty', to:'leg_ent',      type:'pos' },
+  // Top position flow
+  { from:'side_ctrl',   to:'mount',        type:'pos' },
+  { from:'side_ctrl',   to:'north_south',  type:'pos' },
+  { from:'side_ctrl',   to:'kob',          type:'pos' },
+  { from:'side_ctrl',   to:'back_ctrl',    type:'pos' },
+  { from:'side_ctrl',   to:'turtle',       type:'pos' },
+  { from:'mount',       to:'back_ctrl',    type:'pos' },
+  { from:'kob',         to:'mount',        type:'pos' },
+  { from:'kob',         to:'side_ctrl',    type:'pos' },
+  { from:'north_south', to:'side_ctrl',    type:'pos' },
+  { from:'turtle',      to:'back_ctrl',    type:'pos' },
+  { from:'turtle',      to:'side_ctrl',    type:'pos' },
+  { from:'leg_ent',     to:'side_ctrl',    type:'pos' },
+  { from:'standing',    to:'side_ctrl',    type:'pos' },
+  { from:'standing',    to:'back_ctrl',    type:'pos' },
+  // Move-from-position edges
+  ...MOVES.flatMap(m => m.from.map(f => ({ from:f, to:m.id, type:'move' }))),
+  // Move-to-position edges (non-submission landing positions)
+  ...MOVES.flatMap(m => (m.to||[]).map(t => ({ from:m.id, to:t, type:'land' }))),
+  // Submission escape edges: submission ↔ escape_move
+  ...MOVES.filter(m=>m.escapes).flatMap(m =>
+    m.escapes.map(eid => ({ from:m.id, to:eid, type:'escape' }))
+  ),
+];
+
+// ═══════════════════════════════════════════════════════
+// LAYOUT — structured radial seed + force settle
+// ═══════════════════════════════════════════════════════
+const R_POS  = 20;
+const R_MOVE = 13;
+
+const POS_SEEDS = {
+  standing:     { a: -Math.PI/2,         r: 0.12 },
+  clinch:       { a: -Math.PI/2 + 0.25,  r: 0.20 },
+  // Bottom arc — left/lower-left
+  closed_guard: { a: -Math.PI/2 + 0.55,  r: 0.34 },
+  half_guard:   { a: -Math.PI/2 + 0.90,  r: 0.36 },
+  deep_half:    { a: -Math.PI/2 + 1.15,  r: 0.34 },
+  butterfly:    { a: -Math.PI/2 + 1.35,  r: 0.32 },
+  open_guard:   { a: -Math.PI/2 + 1.60,  r: 0.30 },
+  spider_guard: { a: -Math.PI/2 + 1.82,  r: 0.28 },
+  dlr:          { a: -Math.PI/2 + 2.05,  r: 0.26 },
+  x_guard:      { a: -Math.PI/2 + 2.25,  r: 0.22 },
+  fifty_fifty:  { a: -Math.PI/2 + 2.50,  r: 0.20 },
+  leg_ent:      { a: -Math.PI/2 + 2.75,  r: 0.18 },
+  // Top arc — right/lower-right
+  side_ctrl:    { a: -Math.PI/2 - 0.55,  r: 0.34 },
+  mount:        { a: -Math.PI/2 - 0.90,  r: 0.36 },
+  back_ctrl:    { a: -Math.PI/2 - 1.25,  r: 0.34 },
+  turtle:       { a: -Math.PI/2 - 1.55,  r: 0.30 },
+  kob:          { a: -Math.PI/2 - 1.80,  r: 0.26 },
+  north_south:  { a: -Math.PI/2 - 2.10,  r: 0.22 },
+};
+
+function buildNodes(W, H) {
+  const cx = W/2, cy = H/2;
+  const baseR = Math.min(W, H) * 0.40;
+  const posById = {};
+
+  POSITIONS.forEach(p => {
+    const s = POS_SEEDS[p.id] || { a: Math.random()*Math.PI*2, r:0.28 };
+    posById[p.id] = {
+      x: cx + Math.cos(s.a) * baseR * (s.r / 0.34),
+      y: cy + Math.sin(s.a) * baseR * (s.r / 0.34),
+    };
+  });
+
+  const moveById = {};
+  MOVES.forEach(m => {
+    const par = posById[m.from[0]] || {x:cx, y:cy};
+    const a   = Math.random() * Math.PI * 2;
+    const d   = 65 + Math.random() * 55;
+    moveById[m.id] = { x: par.x + Math.cos(a)*d, y: par.y + Math.sin(a)*d };
+  });
+
+  return [
+    ...POSITIONS.map(p => ({ ...p, kind:'pos',  r:R_POS,  vx:0, vy:0, x:posById[p.id].x,  y:posById[p.id].y })),
+    ...MOVES.map(m =>     ({ ...m, kind:'move', r:R_MOVE, vx:0, vy:0, x:moveById[m.id].x, y:moveById[m.id].y })),
+  ];
+}
+
+function forceLayout(nodes, W, H, iters) {
+  const byId = {};
+  nodes.forEach(n => byId[n.id] = n);
+  const cx = W/2, cy = H/2;
+
+  for (let it = 0; it < iters; it++) {
+    const a = Math.pow(1 - it/iters, 1.4);
+
+    // Repulsion
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i+1; j < nodes.length; j++) {
+        const na = nodes[i], nb = nodes[j];
+        const dx = nb.x-na.x, dy = nb.y-na.y;
+        const d  = Math.sqrt(dx*dx+dy*dy)||0.01;
+        const mn = (na.r+nb.r)*4.0;
+        if (d < mn) {
+          const f = (mn-d)/d*0.55*a;
+          na.vx-=dx*f; na.vy-=dy*f;
+          nb.vx+=dx*f; nb.vy+=dy*f;
+        }
+      }
+    }
+
+    // Attraction
+    EDGES.forEach(e => {
+      const na = byId[e.from], nb = byId[e.to];
+      if (!na||!nb) return;
+      const dx = nb.x-na.x, dy = nb.y-na.y;
+      const d  = Math.sqrt(dx*dx+dy*dy)||0.01;
+      const tgt = e.type==='pos' ? 155 : e.type==='escape' ? 100 : 105;
+      const f   = (d-tgt)/d*0.09*a;
+      na.vx+=dx*f; na.vy+=dy*f;
+      nb.vx-=dx*f; nb.vy-=dy*f;
+    });
+
+    // Centre gravity (weak for positions)
+    nodes.forEach(n => {
+      const g = n.kind==='pos' ? 0.0015 : 0.0035;
+      n.vx+=(cx-n.x)*g*a; n.vy+=(cy-n.y)*g*a;
+    });
+
+    // Integrate
+    nodes.forEach(n => {
+      n.vx*=0.82; n.vy*=0.82;
+      n.x+=n.vx;  n.y+=n.vy;
+    });
+  }
+  return nodes;
+}
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+let playerFilter = 'top';
+let focusedId    = null;
+let scores       = {};
+let simNodes     = null;
+let tx=0, ty=0, ts=1;
+let dragging=false, lx=0, ly=0;
+let pinching=false, lpd=0;
+
+const svg        = document.getElementById('graph-svg');
+const edgesLayer = document.getElementById('edges-layer');
+const nodesLayer = document.getElementById('nodes-layer');
+
+function nodeVisible(n) {
+  if (playerFilter==='all') return true;
+  return n.player==='both' || n.player===playerFilter;
+}
+
+function getConnected(id) {
+  const s = new Set();
+  EDGES.forEach(e => {
+    if (e.from===id) s.add(e.to);
+    if (e.to===id)   s.add(e.from);
+  });
+  return s;
+}
+
+// ═══════════════════════════════════════════════════════
+// CENTRE-ON-NODE
+// ═══════════════════════════════════════════════════════
+function centreOnNode(node) {
+  const wrap = document.getElementById('canvas-wrap');
+  const W=wrap.clientWidth, H=wrap.clientHeight;
+  const targetTx = W/2 - node.x*ts;
+  const targetTy = H/2 - node.y*ts;
+  const startTx=tx, startTy=ty;
+  const dur=400, start=performance.now();
+  function step(now) {
+    const t  = Math.min(1,(now-start)/dur);
+    const e  = 1-Math.pow(1-t,3);
+    tx = startTx+(targetTx-startTx)*e;
+    ty = startTy+(targetTy-startTy)*e;
+    render();
+    if (t<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════
+const CAT_COL = {
+  Submission:'#e63946', Sweep:'#f4a261', Takedown:'#a0d250',
+  Pass:'#b478ff', Escape:'#4a9eff', Control:'#7ec8b0',
+};
+
+function render() {
+  if (!simNodes) return;
+  const byId = {};
+  simNodes.forEach(n => byId[n.id]=n);
+  const focConn = focusedId ? getConnected(focusedId) : new Set();
+
+  // EDGES
+  edgesLayer.innerHTML='';
+  EDGES.forEach(e => {
+    const na=byId[e.from], nb=byId[e.to];
+    if (!na||!nb||!nodeVisible(na)||!nodeVisible(nb)) return;
+    const isAct = focusedId && (e.from===focusedId||e.to===focusedId);
+    const line  = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',na.x); line.setAttribute('y1',na.y);
+    line.setAttribute('x2',nb.x); line.setAttribute('y2',nb.y);
+    line.setAttribute('stroke-linecap','round');
+    if (isAct) {
+      const col = e.type==='escape' ? 'rgba(74,158,255,0.7)' :
+                  e.type==='land'   ? 'rgba(160,210,80,0.6)' :
+                                      'rgba(244,162,97,0.6)';
+      line.setAttribute('stroke', col);
+      line.setAttribute('stroke-width', e.type==='pos'?'2.2':'1.5');
+    } else if (e.type==='pos') {
+      line.setAttribute('stroke','rgba(74,158,255,0.15)');
+      line.setAttribute('stroke-width','1.5');
+    } else if (e.type==='land') {
+      line.setAttribute('stroke','rgba(160,210,80,0.08)');
+      line.setAttribute('stroke-width','1');
+      line.setAttribute('stroke-dasharray','2 5');
+    } else if (e.type==='escape') {
+      line.setAttribute('stroke','rgba(74,158,255,0.08)');
+      line.setAttribute('stroke-width','1');
+      line.setAttribute('stroke-dasharray','2 5');
+    } else {
+      line.setAttribute('stroke','rgba(255,255,255,0.04)');
+      line.setAttribute('stroke-width','1');
+      line.setAttribute('stroke-dasharray','3 6');
+    }
+    edgesLayer.appendChild(line);
+  });
+
+  // NODES
+  nodesLayer.innerHTML='';
+  simNodes.forEach(n => {
+    if (!nodeVisible(n)) return;
+    const isFoc  = focusedId===n.id;
+    const isConn = !!(focusedId && focConn.has(n.id));
+    const isDim  = !!(focusedId && !isFoc && !isConn);
+    const scale  = isFoc?1.9:isConn?1.35:1;
+    const baseCol= n.kind==='pos' ? '#4a9eff' : (CAT_COL[n.cat]||'#e63946');
+    const strokeC= isFoc?'#ffffff':isConn?'#f4a261':baseCol;
+    const fillC  = isFoc?baseCol+'55':isConn?'#f4a26133':baseCol+'1a';
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('transform',`translate(${n.x},${n.y}) scale(${scale})`);
+    g.setAttribute('opacity', isDim?'0.12':'1');
+    if (isFoc)  g.setAttribute('filter',n.kind==='pos'?'url(#glow-blue)':'url(#glow-red)');
+    if (isConn) g.setAttribute('filter','url(#glow-amber)');
+
+    // Shape
+    if (n.kind==='pos') {
+      const hw=n.r*1.3, hh=n.r*1.2;
+      const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('d',`M 0 ${-hh} L ${hw} ${hh*0.8} L ${-hw} ${hh*0.8} Z`);
+      path.setAttribute('fill',fillC);
+      path.setAttribute('stroke',strokeC);
+      path.setAttribute('stroke-width',isFoc?'2':isConn?'1.8':'1.3');
+      path.setAttribute('stroke-linejoin','round');
+      g.appendChild(path);
+    } else {
+      const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('r',n.r);
+      c.setAttribute('fill',fillC);
+      c.setAttribute('stroke',strokeC);
+      c.setAttribute('stroke-width',isFoc?'2':isConn?'1.8':'1.1');
+      g.appendChild(c);
+    }
+
+    // Labels
+    const showLabel = isFoc||isConn||n.kind==='pos';
+    if (showLabel) {
+      const words=n.label.split(' ');
+      const lineH=isFoc?10.5:9;
+      const fSize=isFoc?10:isConn?8.5:7.5;
+      const yOff = n.kind==='pos' ? n.r*1.1+5 : n.r+6;
+      const tCol = isFoc?'#ffffff':isConn?'#f4a261':'rgba(180,192,182,0.9)';
+      words.forEach((w,i)=>{
+        const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+        t.setAttribute('text-anchor','middle');
+        t.setAttribute('y',yOff+i*lineH);
+        t.setAttribute('font-size',fSize);
+        t.setAttribute('font-family','Rajdhani,sans-serif');
+        t.setAttribute('font-weight',isFoc?'700':'600');
+        t.setAttribute('fill',tCol);
+        t.setAttribute('letter-spacing','0.5');
+        t.textContent=w;
+        g.appendChild(t);
+      });
+      if (isFoc&&n.desc) {
+        const dw=n.desc.split(' ');
+        let l1='',l2='';
+        dw.forEach(w=>l1.length+w.length<18?(l1+=(l1?' ':'')+w):(l2+=(l2?' ':'')+w));
+        [l1,l2].filter(Boolean).forEach((dl,i)=>{
+          const dt=document.createElementNS('http://www.w3.org/2000/svg','text');
+          dt.setAttribute('text-anchor','middle');
+          dt.setAttribute('y',yOff+words.length*lineH+4+i*8.5);
+          dt.setAttribute('font-size','6.5');
+          dt.setAttribute('font-family','Source Sans 3,sans-serif');
+          dt.setAttribute('fill','rgba(190,200,192,0.65)');
+          dt.textContent=dl;
+          g.appendChild(dt);
+        });
+      }
+    }
+
+    g.style.cursor='pointer';
+    g.addEventListener('click',ev=>{ev.stopPropagation();handleNodeClick(n.id);});
+    g.addEventListener('touchend',ev=>{ev.stopPropagation();ev.preventDefault();handleNodeClick(n.id);},{passive:false});
+    nodesLayer.appendChild(g);
+  });
+
+  edgesLayer.setAttribute('transform',`translate(${tx},${ty}) scale(${ts})`);
+  nodesLayer.setAttribute('transform',`translate(${tx},${ty}) scale(${ts})`);
+}
+
+// ═══════════════════════════════════════════════════════
+// INTERACTION
+// ═══════════════════════════════════════════════════════
+let lastTapId=null, lastTapTime=0;
+function handleNodeClick(id) {
+  const now=Date.now();
+  const dbl=lastTapId===id&&now-lastTapTime<420;
+  lastTapId=id; lastTapTime=now;
+  if (dbl) { openPanel(id); return; }
+  const wasFoc = focusedId===id;
+  focusedId = wasFoc?null:id;
+  render();
+  if (!wasFoc) {
+    const nd=simNodes.find(n=>n.id===id);
+    if (nd) centreOnNode(nd);
+  }
+}
+
+svg.addEventListener('click',e=>{
+  if (e.target===svg||e.target.tagName==='line'){focusedId=null;render();}
+});
+
+function setPlayer(p) {
+  playerFilter=p; focusedId=null;
+  ['btn-top','btn-bot','btn-all'].forEach(id=>document.getElementById(id).className='tbtn');
+  document.getElementById(p==='top'?'btn-top':p==='bottom'?'btn-bot':'btn-all').className=
+    'tbtn '+(p==='bottom'?'a-bot':'a-top');
+  closePanel(); render();
+}
+
+// ═══════════════════════════════════════════════════════
+// PANEL
+// ═══════════════════════════════════════════════════════
+const CAT_CLASS={Submission:'pc-sub',Sweep:'pc-swp',Escape:'pc-esc',Takedown:'pc-tkd',Pass:'pc-pas',Control:'pc-ctr'};
+
+function openPanel(id) {
+  const pos  = POSITIONS.find(p=>p.id===id);
+  const move = MOVES.find(m=>m.id===id);
+  const node = pos||move;
+  if (!node) return;
+
+  const connected = getConnected(id);
+  const connNodes = [...connected].map(cid=>
+    POSITIONS.find(p=>p.id===cid)||MOVES.find(m=>m.id===cid)
+  ).filter(Boolean);
+
+  const typeEl=document.getElementById('pType');
+  if (pos) {
+    typeEl.innerHTML=`<svg width="12" height="12" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="none" stroke="#4a9eff" stroke-width="2"/></svg><span style="color:#4a9eff">Position</span>`;
+  } else {
+    const col=CAT_COL[move.cat]||'#e63946';
+    typeEl.innerHTML=`<svg width="12" height="12" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="${col}" stroke-width="2"/></svg><span style="color:${col}">${move.cat}</span>`;
+  }
+
+  document.getElementById('pTitle').textContent=node.label;
+  document.getElementById('pSubtitle').textContent=node.desc||'';
+
+  const chipsEl=document.getElementById('pChips');
+  if (pos) {
+    chipsEl.innerHTML=`<span class="pc pc-pos">Position</span><span class="pc pc-ctr">${pos.player==='both'?'Both':pos.player==='top'?'⬆ Top':'⬇ Bottom'}</span>`;
+  } else {
+    chipsEl.innerHTML=`<span class="pc ${CAT_CLASS[move.cat]||'pc-ctr'}">${move.cat}</span><span class="pc pc-ctr">${move.player==='both'?'Both':move.player==='top'?'⬆ Top':'⬇ Bottom'}</span>`;
+    // Landing positions
+    if (move.to&&move.to.length>0) {
+      const landNames=move.to.map(tid=>{
+        const pn=POSITIONS.find(p=>p.id===tid);
+        return pn?`<span class="pc pc-pos">→ ${pn.label}</span>`:'';
+      }).join('');
+      chipsEl.innerHTML+=landNames;
+    }
+  }
+
+  const vidEl=document.getElementById('pVid');
+  if (move&&move.vid) {
+    vidEl.style.display='';
+    const _vid=move.vid;
+    vidEl.innerHTML=`
+      <button class="vid-thumb"
+        onclick="(function(wrap,id){
+          wrap.innerHTML='<iframe src=\'https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&modestbranding=1\' allow=\'autoplay; encrypted-media; picture-in-picture\' allowfullscreen></iframe>';
+        })(this.parentNode,'${_vid.id}')">
+        <img src="https://img.youtube.com/vi/${_vid.id}/hqdefault.jpg" alt="Video thumbnail" loading="lazy">
+        <div class="vid-play">
+          <div class="vid-play-btn"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div>
+          <div class="vid-play-lbl">Tap to play inline</div>
+        </div>
+        <div class="vid-badge">▶ YouTube</div>
+        <div class="vid-src-lbl">${_vid.src}</div>
+      </button>`;
+  } else { vidEl.style.display='none'; }
+
+  const ss=move&&move.sensei;
+  document.getElementById('senseiLbl').style.display=ss?'':'none';
+  document.getElementById('pSenseiBlk').style.display=ss?'':'none';
+  if (ss) document.getElementById('pSenseiTxt').textContent=move.sensei;
+
+  const st=move&&move.steps;
+  document.getElementById('stepsLbl').style.display=st?'':'none';
+  document.getElementById('pSteps').innerHTML=st
+    ?move.steps.map((s,i)=>`<li><div class="sn">${i+1}</div><div>${s}</div></li>`).join(''):'';
+
+  const er=move&&move.errs;
+  document.getElementById('errsLbl').style.display=er?'':'none';
+  document.getElementById('pErrsBlk').style.display=er?'':'none';
+  if (er) document.getElementById('pErrsList').innerHTML=move.errs.map(e=>`<div class="err-row">${e}</div>`).join('');
+
+  // Submission escapes section
+  const hasEscapes=move&&move.cat==='Submission'&&move.escapes&&move.escapes.length>0;
+  document.getElementById('escapesLbl').style.display=hasEscapes?'':'none';
+  document.getElementById('pEscapesBlk').style.display=hasEscapes?'':'none';
+  if (hasEscapes) {
+    document.getElementById('pEscapesList').innerHTML=move.escapes.map(eid=>{
+      const em=MOVES.find(m=>m.id===eid);
+      if (!em) return '';
+      return `<span class="escape-chip" onclick="closePanel();setTimeout(()=>handleNodeClick('${eid}'),100)">
+        🔵 ${em.label}
+      </span>`;
+    }).join('');
+  }
+
+  // Connected nodes
+  document.getElementById('pConnected').innerHTML=
+    connNodes.map(cn=>`<span class="conn-chip">${cn.label}</span>`).join('');
+
+  renderScores(id);
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('panel').scrollTop=0;
+}
+
+function renderScores(id) {
+  const sc=scores[id]||{e:0,f:0};
+  document.getElementById('atkLbl').textContent=sc.e>0?'★'.repeat(sc.e):'—';
+  document.getElementById('defLbl').textContent=sc.f>0?'★'.repeat(sc.f):'—';
+  document.getElementById('atkStars').innerHTML=[1,2,3,4,5].map(n=>
+    `<div class="star${sc.e>=n?' on':''}" onclick="rate('${id}','e',${n})">⭐</div>`).join('');
+  document.getElementById('defStars').innerHTML=[1,2,3,4,5].map(n=>
+    `<div class="star${sc.f>=n?' on':''}" onclick="rate('${id}','f',${n})">🛡️</div>`).join('');
+}
+function rate(id,t,v){if(!scores[id])scores[id]={e:0,f:0};scores[id][t]=v;renderScores(id);}
+function closePanel(){document.getElementById('overlay').classList.remove('open');}
+function maybeClose(e){if(e.target===document.getElementById('overlay'))closePanel();}
+
+// ═══════════════════════════════════════════════════════
+// PAN & ZOOM
+// ═══════════════════════════════════════════════════════
+function doZoom(factor,px,py){
+  const wrap=document.getElementById('canvas-wrap');
+  if(px===undefined){px=wrap.clientWidth/2;py=wrap.clientHeight/2;}
+  const ns=Math.max(0.2,Math.min(5,ts*factor));
+  tx=px-(px-tx)*(ns/ts); ty=py-(py-ty)*(ns/ts); ts=ns; render();
+}
+function centreView(){
+  if(!simNodes)return;
+  const wrap=document.getElementById('canvas-wrap');
+  const W=wrap.clientWidth,H=wrap.clientHeight;
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  simNodes.filter(nodeVisible).forEach(n=>{
+    x0=Math.min(x0,n.x-n.r*4);x1=Math.max(x1,n.x+n.r*4);
+    y0=Math.min(y0,n.y-n.r*4);y1=Math.max(y1,n.y+n.r*4);
+  });
+  const gW=x1-x0,gH=y1-y0;
+  ts=Math.min(W/gW,H/gH)*0.9;
+  tx=(W-gW*ts)/2-x0*ts; ty=(H-gH*ts)/2-y0*ts;
+}
+function resetView(){focusedId=null;centreView();render();}
+
+const cw=document.getElementById('canvas-wrap');
+cw.addEventListener('mousedown',e=>{
+  if(e.target.closest('.ctrl-btn,.reset-btn'))return;
+  dragging=true;lx=e.clientX;ly=e.clientY;cw.classList.add('grabbing');
+});
+window.addEventListener('mousemove',e=>{
+  if(!dragging)return;
+  tx+=e.clientX-lx;ty+=e.clientY-ly;lx=e.clientX;ly=e.clientY;render();
+});
+window.addEventListener('mouseup',()=>{dragging=false;cw.classList.remove('grabbing');});
+cw.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const r=cw.getBoundingClientRect();
+  doZoom(e.deltaY<0?1.1:0.9,e.clientX-r.left,e.clientY-r.top);
+},{passive:false});
+cw.addEventListener('touchstart',e=>{
+  if(e.touches.length===1){
+    const t=e.touches[0];
+    if(t.target.closest('.ctrl-btn,.reset-btn'))return;
+    dragging=true;lx=t.clientX;ly=t.clientY;
+  }else if(e.touches.length===2){
+    dragging=false;pinching=true;
+    lpd=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+  }
+},{passive:true});
+cw.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(e.touches.length===1&&dragging){
+    tx+=e.touches[0].clientX-lx;ty+=e.touches[0].clientY-ly;
+    lx=e.touches[0].clientX;ly=e.touches[0].clientY;render();
+  }else if(e.touches.length===2&&pinching){
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    const r=cw.getBoundingClientRect();
+    doZoom(d/lpd,(e.touches[0].clientX+e.touches[1].clientX)/2-r.left,(e.touches[0].clientY+e.touches[1].clientY)/2-r.top);
+    lpd=d;
+  }
+},{passive:false});
+cw.addEventListener('touchend',()=>{dragging=false;pinching=false;});
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+function init(){
+  const wrap=document.getElementById('canvas-wrap');
+  const W=wrap.clientWidth||window.innerWidth;
+  const H=(wrap.clientHeight||window.innerHeight)-100;
+  simNodes=buildNodes(W*1.25,H*1.25);
+  simNodes=forceLayout(simNodes,W*1.25,H*1.25,420);
+  centreView(); render();
+}
+window.addEventListener('resize',()=>{centreView();render();});
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+}
+init();
+</script>
+</body>
+</html>
