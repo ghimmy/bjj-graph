@@ -59,9 +59,9 @@ body{display:flex;flex-direction:column;}
 .pc-pas{background:rgba(180,120,255,0.15);color:#b478ff;border:1px solid rgba(180,120,255,0.3);}
 .pc-pos{background:rgba(74,158,255,0.12);color:#4a9eff;border:1px solid rgba(74,158,255,0.25);}
 .pc-ctr{background:rgba(255,255,255,0.06);color:var(--text-muted);border:1px solid var(--border);}
-.close-x{position:absolute;top:12px;right:16px;width:36px;height:36px;border-radius:8px;background:var(--border);border:none;cursor:pointer;font-size:15px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;touch-action:auto;z-index:10;-webkit-tap-highlight-color:rgba(255,255,255,0.1);}
+.close-x{position:absolute;top:12px;right:16px;width:44px;height:44px;border-radius:8px;background:var(--border);border:none;cursor:pointer;font-size:16px;color:var(--text-primary);display:flex;align-items:center;justify-content:center;touch-action:manipulation;z-index:300;-webkit-tap-highlight-color:rgba(230,57,70,0.3);-webkit-appearance:none;font-weight:700;}
 .vid-wrap{margin:0 18px 14px;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:16/9;position:relative;}
-.vid-thumb{width:100%;height:100%;position:relative;cursor:pointer;display:block;border:none;padding:0;background:#111;}
+.vid-thumb{width:100%;height:100%;position:relative;cursor:pointer;display:block;border:none;padding:0;background:#111;touch-action:manipulation;-webkit-tap-highlight-color:rgba(230,57,70,0.3);-webkit-appearance:none;user-select:none;}
 .vid-thumb img{width:100%;height:100%;object-fit:cover;display:block;opacity:.82;transition:opacity .2s;}
 .vid-thumb:hover img,.vid-thumb:active img{opacity:1;}
 .vid-play{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;}
@@ -85,7 +85,7 @@ body{display:flex;flex-direction:column;}
 .err-row{font-size:12.5px;color:#9a6068;line-height:1.55;padding:2px 0;display:flex;gap:8px;}
 .err-row::before{content:'×';flex-shrink:0;color:#e63946;font-weight:700;}
 .escape-blk{background:rgba(74,158,255,0.06);border:1px solid rgba(74,158,255,0.15);border-left:3px solid #4a9eff;border-radius:0 8px 8px 0;padding:10px 12px;}
-.escape-chip{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;letter-spacing:.5px;padding:4px 10px;border-radius:5px;border:1px solid rgba(74,158,255,0.25);color:#4a9eff;background:rgba(74,158,255,0.08);font-family:'Rajdhani',sans-serif;text-transform:uppercase;margin:3px 3px 0 0;cursor:pointer;}
+.escape-chip{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;letter-spacing:.5px;padding:6px 12px;border-radius:5px;border:1px solid rgba(74,158,255,0.25);color:#4a9eff;background:rgba(74,158,255,0.08);font-family:'Rajdhani',sans-serif;text-transform:uppercase;margin:3px 3px 0 0;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(74,158,255,0.3);user-select:none;}
 .escape-chip:hover{background:rgba(74,158,255,0.15);}
 .conn-chips{display:flex;gap:6px;flex-wrap:wrap;}
 .conn-chip{font-size:10px;font-weight:600;letter-spacing:.5px;padding:4px 10px;border-radius:5px;border:1px solid var(--border);color:var(--text-muted);background:rgba(255,255,255,0.03);font-family:'Rajdhani',sans-serif;text-transform:uppercase;}
@@ -94,7 +94,7 @@ body{display:flex;flex-direction:column;}
 .sc-lbl{font-family:'Rajdhani',sans-serif;font-size:9px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);}
 .sc-val{font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:#f4a261;}
 .stars{display:flex;gap:5px;}
-.star{width:34px;height:34px;border-radius:7px;border:1px solid var(--border);background:transparent;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .12s;}
+.star{width:38px;height:38px;border-radius:7px;border:1px solid var(--border);background:transparent;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .12s;touch-action:manipulation;-webkit-tap-highlight-color:rgba(244,162,97,0.3);user-select:none;}
 .star.on{background:rgba(244,162,97,0.12);border-color:rgba(244,162,97,0.4);}
 .star:active{transform:scale(.88);}
 </style>
@@ -1176,47 +1176,74 @@ cw.addEventListener('touchmove', function(e) {
 
 cw.addEventListener('touchend', function() { dragging = false; pinching = false; });
 
-// ── EVENT DELEGATION — single listener for all panel buttons ──
-document.addEventListener('click', function(e) {
+// ── PANEL EVENT HANDLER — iOS PWA-safe ──
+// iOS standalone mode requires touchend events for reliability on dynamic elements
+// We attach a single handler that catches both click (desktop) and touchend (mobile)
+// using a touch-aware dispatch that avoids the iOS 300ms tap delay issue
+function handlePanelAction(target) {
   // Close button
-  if (e.target.closest('#close-panel-btn')) {
+  if (target.closest('#close-panel-btn')) {
     closePanel();
-    return;
+    return true;
   }
   // Overlay background tap
-  if (e.target.id === 'overlay') {
+  if (target.id === 'overlay') {
     closePanel();
-    return;
+    return true;
   }
   // Rating stars
-  const star = e.target.closest('.star[data-id]');
+  var star = target.closest('.star[data-id]');
   if (star) {
     rate(star.dataset.id, star.dataset.type, parseInt(star.dataset.val));
-    return;
+    return true;
   }
   // Escape chips
-  const chip = e.target.closest('.escape-chip[data-escape-id]');
+  var chip = target.closest('.escape-chip[data-escape-id]');
   if (chip) {
-    const eid = chip.dataset.escapeId;
+    var eid = chip.dataset.escapeId;
     closePanel();
     setTimeout(function() { handleNodeClick(eid); }, 150);
-    return;
+    return true;
   }
-  // Video thumbnail tap — load iframe
-  const thumb = e.target.closest('.vid-thumb[data-vid-id]');
+  // Video thumbnail tap
+  var thumb = target.closest('.vid-thumb[data-vid-id]');
   if (thumb) {
-    var id = thumb.dataset.vidId;
+    var vid = thumb.dataset.vidId;
     var wrap = document.getElementById('pVid');
-    if (wrap && id) {
+    if (wrap && vid) {
       wrap.innerHTML =
-        '<iframe src="https://www.youtube-nocookie.com/embed/' + id +
+        '<iframe src="https://www.youtube-nocookie.com/embed/' + vid +
         '?rel=0&modestbranding=1&playsinline=1"' +
         ' allow="encrypted-media; picture-in-picture" allowfullscreen' +
         ' style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>';
     }
-    return;
+    return true;
   }
-});
+  return false;
+}
+
+// Attach handler to the PANEL and OVERLAY directly (not document)
+// This way iOS PWA fires events reliably because they are attached to real DOM nodes
+// We use touchend on iOS (fires immediately) and click on desktop
+var _lastTouchEnd = 0;
+function attachPanelHandler() {
+  var overlay = document.getElementById('overlay');
+  if (!overlay) return;
+  // touchend — iOS reliable
+  overlay.addEventListener('touchend', function(e) {
+    if (handlePanelAction(e.target)) {
+      e.preventDefault();
+      e.stopPropagation();
+      _lastTouchEnd = Date.now();
+    }
+  }, false);
+  // click — desktop + iOS fallback (only if touchend didn't just fire)
+  overlay.addEventListener('click', function(e) {
+    if (Date.now() - _lastTouchEnd < 500) return; // touchend already handled this
+    handlePanelAction(e.target);
+  }, false);
+}
+attachPanelHandler();
 
 // ── INIT ──
 function init() {

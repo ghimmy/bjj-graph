@@ -1,5 +1,5 @@
-// v5 — index.html always network-fresh, never cached
-const CACHE = 'bjj-graph-v5';
+// v6 — iOS PWA touch event fixes
+const CACHE = 'bjj-graph-v6';
 const STATIC = [
   '/bjj-graph/manifest.json',
   '/bjj-graph/icon-192.png',
