@@ -1001,8 +1001,9 @@ function openPanel(id) {
     vidEl.style.display = '';
     const vidId  = move.vid.id;
     const vidSrc = move.vid.src;
+    // data-vid-id lets delegation handle the tap — no addEventListener on dynamic element
     vidEl.innerHTML =
-      '<button class="vid-thumb" id="vid-thumb-btn" type="button">' +
+      '<button class="vid-thumb" data-vid-id="' + vidId + '" type="button">' +
         '<img src="https://img.youtube.com/vi/' + vidId + '/hqdefault.jpg" alt="Video thumbnail" loading="lazy">' +
         '<div class="vid-play">' +
           '<div class="vid-play-btn"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div>' +
@@ -1011,12 +1012,6 @@ function openPanel(id) {
         '<div class="vid-badge">▶ YouTube</div>' +
         '<div class="vid-src-lbl">' + vidSrc + '</div>' +
       '</button>';
-    document.getElementById('vid-thumb-btn').addEventListener('click', function() {
-      document.getElementById('pVid').innerHTML =
-        '<iframe src="https://www.youtube-nocookie.com/embed/' + vidId +
-        '?rel=0&modestbranding=1&playsinline=1" allow="encrypted-media; picture-in-picture" allowfullscreen ' +
-        'style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>';
-    });
   } else {
     vidEl.style.display = 'none';
   }
@@ -1205,6 +1200,20 @@ document.addEventListener('click', function(e) {
     const eid = chip.dataset.escapeId;
     closePanel();
     setTimeout(function() { handleNodeClick(eid); }, 150);
+    return;
+  }
+  // Video thumbnail tap — load iframe
+  const thumb = e.target.closest('.vid-thumb[data-vid-id]');
+  if (thumb) {
+    var id = thumb.dataset.vidId;
+    var wrap = document.getElementById('pVid');
+    if (wrap && id) {
+      wrap.innerHTML =
+        '<iframe src="https://www.youtube-nocookie.com/embed/' + id +
+        '?rel=0&modestbranding=1&playsinline=1"' +
+        ' allow="encrypted-media; picture-in-picture" allowfullscreen' +
+        ' style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>';
+    }
     return;
   }
 });
