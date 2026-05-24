@@ -1,4 +1,5 @@
-const CACHE = 'bjj-graph-v3';
+// v4 — cache bust, forces fresh load on all clients
+const CACHE = 'bjj-graph-v4';
 const ASSETS = [
   '/bjj-graph/',
   '/bjj-graph/index.html',
@@ -7,45 +8,55 @@ const ASSETS = [
   '/bjj-graph/icon-512.png',
 ];
 
-self.addEventListener('install', e => {
+self.addEventListener('install', function(e) {
   e.waitUntil(
     caches.open(CACHE)
-      .then(c => c.addAll(ASSETS))
-      .then(() => self.skipWaiting())
+      .then(function(c) { return c.addAll(ASSETS); })
+      .then(function() { return self.skipWaiting(); })
   );
 });
 
-self.addEventListener('activate', e => {
+self.addEventListener('activate', function(e) {
   e.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
+    caches.keys().then(function(keys) {
+      return Promise.all(keys.map(function(k) {
+        return caches.delete(k); // delete every old cache version
+      }));
+    }).then(function() {
+      return self.clients.claim(); // take control immediately
+    })
   );
 });
 
-self.addEventListener('fetch', e => {
+self.addEventListener('fetch', function(e) {
   const url = new URL(e.request.url);
-  // Always fetch HTML fresh — never serve a cached 404
+
+  // Always fetch HTML fresh — never serve cached index
   if (url.pathname === '/bjj-graph/' || url.pathname === '/bjj-graph/index.html') {
     e.respondWith(
-      fetch(e.request)
-        .then(res => {
+      fetch(e.request, { cache: 'no-cache' })
+        .then(function(res) {
           if (res && res.status === 200) {
-            caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+            var clone = res.clone();
+            caches.open(CACHE).then(function(c) { c.put(e.request, clone); });
           }
           return res;
         })
-        .catch(() => caches.match('/bjj-graph/index.html'))
+        .catch(function() {
+          return caches.match('/bjj-graph/index.html');
+        })
     );
     return;
   }
-  // Cache first for everything else
+
+  // Cache first for icons, manifest etc
   e.respondWith(
-    caches.match(e.request).then(cached => {
+    caches.match(e.request).then(function(cached) {
       if (cached) return cached;
-      return fetch(e.request).then(res => {
+      return fetch(e.request).then(function(res) {
         if (!res || res.status !== 200 || res.type === 'opaque') return res;
-        caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+        var clone = res.clone();
+        caches.open(CACHE).then(function(c) { c.put(e.request, clone); });
         return res;
       });
     })
